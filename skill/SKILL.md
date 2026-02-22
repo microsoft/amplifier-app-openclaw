@@ -3,144 +3,143 @@ name: amplifier-openclaw
 description: "Delegate complex tasks to Amplifier's multi-agent framework. Use when: (1) research/comparison needing multiple perspectives, (2) multi-file code projects, (3) architecture/design reviews, (4) user asks for deep/thorough work. NOT for: simple Q&A, quick edits, casual chat, anything needing <5s response. CLI: amplifier-openclaw."
 metadata:
   {
-    "openclaw": { "emoji": "⚡", "requires": { "anyBins": ["amplifier-openclaw"] } },
+    "openclaw":
+      {
+        "emoji": "⚡",
+        "requires": { "bins": ["amplifier-openclaw"] },
+        "install":
+          [
+            {
+              "id": "uv",
+              "kind": "uv",
+              "package": "amplifier-app-openclaw @ git+https://github.com/bkrabach/amplifier-app-openclaw@main",
+              "bins": ["amplifier-openclaw"],
+              "label": "Install Amplifier OpenClaw integration (uv)",
+            },
+          ],
+      },
   }
 ---
 
 # Amplifier — Multi-Agent Delegation
 
-Amplifier is a multi-agent AI framework. It handles tasks that benefit from specialist agents, structured workflows, or parallel investigation.
-
-Two modes are available:
-- **Phase 0 (CLI):** Direct `amplifier-openclaw run` — simple, stateless, one task at a time
-- **Phase 1 (Sidecar):** Persistent JSON-RPC sidecar via helper scripts — streaming, governance, recipes
+Amplifier is a multi-agent AI framework. Delegate tasks that benefit from specialist agents, structured workflows, or parallel investigation.
 
 ## When to Delegate
 
 **High confidence → delegate immediately:**
-- "Research X and compare approaches" → `--bundle foundation`
-- "Build a Python tool that does X" → `--bundle python-dev`
-- "Review this code for security and design" → `--bundle design-intelligence`
+- "Research X and compare approaches"
+- "Build a Python tool that does X"
+- "Review this code for security and design"
 - User says "amplifier", "deep dive", "thorough", "comprehensive"
-- Task has clear subtasks that benefit from parallel agents
+- Task has clear subtasks benefiting from parallel agents
 
 **Medium confidence → offer the choice:**
-- "Analyze this codebase" → "I can do a quick analysis, or delegate to Amplifier for a thorough multi-agent review."
+- "I can do a quick analysis, or delegate to Amplifier for a thorough multi-agent review."
 
 **Low confidence → handle yourself:**
 - Simple Q&A, quick code edits, casual conversation, anything needing immediate response
 
-## Phase 0 — Direct CLI (Default)
+## Usage
 
-### Quick Start
+### Basic Delegation
 
 ```bash
-# Delegate a task
 exec command:"amplifier-openclaw run 'Research the top 3 Python web frameworks' --bundle foundation" background:true timeout:600
 ```
 
-### Or use the wrapper script:
+### With Model Selection
+
+Pass `--model` to use a specific LLM. The router automatically picks the best Amplifier provider:
 
 ```bash
-exec command:"amplifier-tool.sh delegate --bundle foundation 'Research local-first AI approaches'" background:true timeout:600
+# Anthropic — full thinking, caching, tool repair
+exec command:"amplifier-openclaw run --model anthropic/claude-sonnet-4-20250514 'Deep code review' --bundle foundation" background:true timeout:600
+
+# Gemini — fast, large context
+exec command:"amplifier-openclaw run --model gemini/gemini-2.5-flash 'Quick analysis' --bundle foundation" background:true timeout:300
+
+# Any model OpenClaw has configured works automatically
+exec command:"amplifier-openclaw run --model xai/grok-3 'Research task'" background:true timeout:600
 ```
 
-### CLI Reference
+**Tip:** If OpenClaw is using a specific model, pass it through with `--model` so Amplifier uses the same one.
+
+### Provider Routing
+
+The `--model` flag auto-routes to the best provider:
+
+| Model | Provider | Features |
+|---|---|---|
+| `anthropic/claude-*` | provider-anthropic | Thinking, caching, 1M context, tool repair |
+| `openai/gpt-4o*`, `openai/o3*` | provider-openai | Responses API, reasoning |
+| Everything else | provider-litellm | 100+ providers via env vars |
+
+No separate API keys needed — Amplifier inherits whatever OpenClaw has configured.
+
+### Bundles
 
 ```bash
-amplifier-openclaw run "prompt" --bundle NAME --cwd PATH --timeout SECS
-amplifier-openclaw bundles list [--root-only]
-amplifier-openclaw bundles add <source>
-amplifier-openclaw cost [--session ID] [--period today|week|month]
+amplifier-openclaw bundles list
 ```
 
-### JSON Output
+| Bundle | Best For |
+|--------|----------|
+| `foundation` | General: research, analysis, planning (default) |
+| `superpowers` | Multi-agent brainstorm, deep investigation |
+| `coder` | Code generation, refactoring, debugging |
+
+### Session Persistence
+
+```bash
+# Start a named session
+exec command:"amplifier-openclaw run --session-name my-project 'Start building the auth module' --bundle foundation" background:true
+
+# Resume later
+exec command:"amplifier-openclaw run --resume --session-name my-project 'Now add unit tests'" background:true
+```
+
+### Modes
+
+Amplifier supports slash-command modes in prompts. **Modes do not carry over between runs** — include the mode at the start of each prompt:
+
+```bash
+# Brainstorm mode (uses all agents)
+exec command:"amplifier-openclaw run --bundle superpowers '/brainstorm How should we architect the new API?'" background:true
+
+# Research mode
+exec command:"amplifier-openclaw run --bundle foundation '/research Latest advances in RAG'" background:true
+```
+
+## JSON Output
 
 ```json
 {
   "response": "The analysis found...",
-  "session_id": "abc-123",
   "usage": {
-    "input_tokens": 4200,
+    "input_tokens": 28566,
     "output_tokens": 1800,
     "estimated_cost": 0.12,
     "tool_invocations": 3
   },
-  "duration_seconds": 45.2,
-  "bundle": "foundation"
+  "status": "completed"
 }
 ```
 
-## Phase 1 — Sidecar Mode (Advanced)
-
-For streaming progress, governance evaluation, and automation recipes, use the sidecar scripts.
-
-### Sidecar Lifecycle
+## Cost Tracking
 
 ```bash
-# Start the sidecar (persists across requests)
-exec command:"sidecar-manager.sh start"
-
-# Check status
-exec command:"sidecar-manager.sh status"
-
-# Stop when done
-exec command:"sidecar-manager.sh stop"
+exec command:"amplifier-openclaw cost --period week"
 ```
 
-The sidecar auto-starts if needed when using `amplifier-tool.sh` with `AMPLIFIER_USE_SIDECAR=1`.
-
-### Delegating via Sidecar
-
-```bash
-exec command:"AMPLIFIER_USE_SIDECAR=1 amplifier-tool.sh delegate --bundle foundation 'Research X'" background:true timeout:600
-```
-
-### Governance Evaluation (Phase 1)
-
-Before running a potentially risky tool call, evaluate it:
-
-```bash
-exec command:'AMPLIFIER_USE_SIDECAR=1 amplifier-tool.sh evaluate "{\"tool\":\"exec\",\"args\":{\"command\":\"rm -rf /tmp/data\"}}"'
-```
-
-Returns `{"action":"deny","reason":"..."}`, `{"action":"ask_user","reason":"..."}`, or `{"action":"continue"}`.
-
-### Automation Recipes (Phase 1)
-
-Run multi-step workflows:
-
-```bash
-exec command:'AMPLIFIER_USE_SIDECAR=1 amplifier-tool.sh recipe morning-briefing "{\"channel\":\"whatsapp\"}"'
-```
-
-## Available Bundles
-
-| Bundle | Best For |
-|--------|----------|
-| `foundation` | General: research, analysis, planning, comparison |
-| `python-dev` | Python projects: build, debug, test, review |
-| `design-intelligence` | Architecture & design review, code quality |
-| `recipes` | Multi-step declarative workflows |
-
-**Default to `foundation`** unless the task clearly fits another bundle.
+Report costs only when asked or when notable (>$1).
 
 ## Interpreting Results
 
-- **`response`**: The main result — present this to the user
-- **`usage.estimated_cost`**: May be `0.0`; don't alarm about zero-cost results
-- **`error`**: If present, report in plain language, don't dump raw JSON
-- **`session_id`**: Save for potential follow-up work
-
-## Running in Background
-
-For tasks >30 seconds:
-
-```bash
-exec command:"amplifier-tool.sh delegate 'Build a REST API for todo items' --bundle python-dev --timeout 600" background:true
-```
-
-Monitor with `process action:log sessionId:XXX` and report results when complete.
+- **`response`**: Present to the user (the main output)
+- **`error`**: Report in plain language, don't dump raw JSON
+- **`usage.estimated_cost`**: May be `0.0` — don't alarm about zero
+- **`status`**: "completed", "cancelled", or error state
 
 ## During Active Delegation
 
@@ -148,19 +147,16 @@ Monitor with `process action:log sessionId:XXX` and report results when complete
 - **Unrelated questions** → answer yourself, don't interrupt Amplifier
 - **Follow-up** → tell user you'll pass it along when current task finishes
 
-## Cost Reporting
+## Install
+
+If not already installed:
 
 ```bash
-exec command:"amplifier-tool.sh cost --period week"
+curl -fsSL https://raw.githubusercontent.com/bkrabach/amplifier-app-openclaw/main/install.sh | bash
 ```
 
-Report costs only when asked or when notable (>$1).
+Or manually:
 
-## Duration Awareness
-
-Typical delegation times:
-- Simple research: 30–60 seconds
-- Code project: 2–5 minutes
-- Deep analysis: 1–3 minutes
-
-On channels without streaming (WhatsApp), delegate only if the task genuinely needs multi-agent power.
+```bash
+uv tool install "amplifier-app-openclaw @ git+https://github.com/bkrabach/amplifier-app-openclaw@main"
+```
