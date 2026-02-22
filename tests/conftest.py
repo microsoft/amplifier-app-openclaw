@@ -21,7 +21,25 @@ def _make_mock_module(name: str) -> ModuleType:
 
 # amplifier_core (top-level + submodules we might need)
 if "amplifier_core" not in sys.modules:
-    _make_mock_module("amplifier_core")
+    ac = _make_mock_module("amplifier_core")
+
+    class _ToolResult:
+        def __init__(self, success=True, output=None, error=None):
+            self.success = success
+            self.output = output
+            self.error = error
+
+    class _HookResult:
+        def __init__(self, action="continue"):
+            self.action = action
+
+    ac.ToolResult = _ToolResult
+
+    # Also need amplifier_core.models for HookResult
+    acm = _make_mock_module("amplifier_core.models")
+    acm.HookResult = _HookResult
+else:
+    ac = sys.modules["amplifier_core"]
 
 # amplifier_foundation and its submodules
 if "amplifier_foundation" not in sys.modules:
@@ -47,6 +65,10 @@ if "amplifier_foundation.registry" not in sys.modules:
     reg = _make_mock_module("amplifier_foundation.registry")
     reg.BundleRegistry = MagicMock
     reg.load_bundle = AsyncMock()
+
+if "amplifier_foundation.bundle" not in sys.modules:
+    bundle_mod = _make_mock_module("amplifier_foundation.bundle")
+    bundle_mod.PreparedBundle = MagicMock
 
 if "amplifier_foundation.mentions" not in sys.modules:
     mentions = _make_mock_module("amplifier_foundation.mentions")

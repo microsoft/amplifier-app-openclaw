@@ -29,6 +29,9 @@ dev = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+markers = [
+    "integration: end-to-end sidecar integration tests",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/amplifier_app_openclaw"]
