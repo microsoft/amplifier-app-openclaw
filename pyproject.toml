@@ -27,6 +27,10 @@ amplifier-module-context-persistent = { git = "https://github.com/microsoft/ampl
 amplifier-module-tool-mcp = { git = "https://github.com/microsoft/amplifier-module-tool-mcp", branch = "main" }
 amplifier-module-tool-web = { git = "https://github.com/microsoft/amplifier-module-tool-web", branch = "main" }
 
+[project.entry-points."amplifier_modules"]
+provider-openclaw = "amplifier_app_openclaw.modules.provider_openclaw:mount"
+tool-openclaw = "amplifier_app_openclaw.modules.tool_openclaw:mount"
+
 [project.scripts]
 amplifier-openclaw = "amplifier_app_openclaw.cli:cli"
 
