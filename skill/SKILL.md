@@ -63,7 +63,7 @@ exec command:"amplifier-openclaw run --model gemini/gemini-2.5-flash 'Quick anal
 exec command:"amplifier-openclaw run --model xai/grok-3 'Research task'" background:true timeout:600
 ```
 
-**Tip:** If OpenClaw is using a specific model, pass it through with `--model` so Amplifier uses the same one.
+**Important:** Always pass `--model` matching your current OpenClaw model (from the Runtime line in your system prompt, e.g. `model=anthropic/claude-opus-4-6`). This ensures Amplifier uses the same provider and doesn't need separate API keys.
 
 ### Provider Routing
 
