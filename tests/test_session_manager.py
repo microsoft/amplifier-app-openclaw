@@ -300,5 +300,6 @@ class TestHandlerRegistration:
             "session/inject", "session/resume",
             "bundle/list", "bundle/add",
             "augment/evaluate_tool", "augment/cost_report", "augment/query_context",
+            "augment/list_tools", "augment/discover",
         }
         assert expected == registered

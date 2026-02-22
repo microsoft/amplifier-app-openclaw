@@ -33,6 +33,11 @@ from amplifier_app_openclaw.rpc import (
 )
 from amplifier_app_openclaw.runner import CHAT_OVERLAY
 from amplifier_app_openclaw.spawn import OpenClawSpawnManager
+from amplifier_app_openclaw.discovery import (
+    discover_openclaw_tools,
+    list_session_tools,
+    register_amplifier_tools,
+)
 from amplifier_app_openclaw.tools import create_openclaw_tools
 
 logger = logging.getLogger(__name__)
@@ -272,6 +277,9 @@ class SessionManager:
             name="injection_manager",
         )
 
+        # Register RPC reader as capability (for module-based tool mounting)
+        session.coordinator.register_capability("openclaw.rpc_reader", self._response_reader)
+
         # Register mention resolver
         resolver = BaseMentionResolver(base_path=Path(cwd))
         session.coordinator.register_capability("mention_resolver", resolver)
@@ -307,6 +315,13 @@ class SessionManager:
         # Collect available agents and tools
         agents = list(session.config.get("agents", {}).keys())
         tool_names = list(session.coordinator.mount_points.get("tools", {}).keys())
+
+        # Notify OpenClaw about available tools
+        try:
+            tool_specs = list_session_tools(session)
+            register_amplifier_tools(self._writer, session_id, tool_specs)
+        except Exception:
+            logger.debug("Failed to register tools with OpenClaw", exc_info=True)
 
         return {
             "session_id": session_id,
@@ -665,6 +680,51 @@ class SessionManager:
                 })
             return {"error": str(exc), "source": bundle_name}
 
+    # -- Discovery handlers ----------------------------------------------------
+
+    async def handle_list_tools(self, params: dict[str, Any]) -> Any:
+        """Handle ``augment/list_tools``.
+
+        Params:
+            session_id: str
+        Returns:
+            tools: list of tool specs
+        """
+        session_id = params.get("session_id", "")
+        state = self._sessions.get(session_id)
+        if state is None:
+            raise ValueError(f"Unknown session: {session_id}")
+        return {"tools": list_session_tools(state.session)}
+
+    async def handle_discover(self, params: dict[str, Any]) -> Any:
+        """Handle ``augment/discover``.
+
+        Returns both Amplifier and OpenClaw capabilities.
+
+        Params:
+            session_id: str (optional) — include tools from a specific session
+        """
+        result: dict[str, Any] = {}
+
+        # Amplifier tools (if session specified)
+        session_id = params.get("session_id", "")
+        if session_id:
+            state = self._sessions.get(session_id)
+            if state is None:
+                raise ValueError(f"Unknown session: {session_id}")
+            result["amplifier_tools"] = list_session_tools(state.session)
+        else:
+            result["amplifier_tools"] = []
+
+        # OpenClaw tools (best-effort)
+        openclaw_tools = await discover_openclaw_tools(self._response_reader)
+        result["openclaw_tools"] = [
+            {"name": t.name, "description": t.description, "input_schema": t.input_schema}
+            for t in openclaw_tools
+        ]
+
+        return result
+
     # -- Clean shutdown --------------------------------------------------------
 
     async def cleanup_all(self) -> None:
@@ -697,3 +757,5 @@ class SessionManager:
         rpc_reader.register("augment/evaluate_tool", self.handle_evaluate_tool)
         rpc_reader.register("augment/cost_report", self.handle_cost_report)
         rpc_reader.register("augment/query_context", self.handle_query_context)
+        rpc_reader.register("augment/list_tools", self.handle_list_tools)
+        rpc_reader.register("augment/discover", self.handle_discover)

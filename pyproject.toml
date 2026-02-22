@@ -42,5 +42,8 @@ markers = [
     "integration: end-to-end sidecar integration tests",
 ]
 
+[project.entry-points."amplifier.modules"]
+tool-openclaw = "amplifier_app_openclaw.modules.tool_openclaw:mount"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/amplifier_app_openclaw"]
