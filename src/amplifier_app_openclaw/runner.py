@@ -98,6 +98,21 @@ async def run_task(
             session_cwd=Path(cwd),
         )
 
+        # Register a hook to accumulate token usage from provider responses
+        from amplifier_core.hooks import HookResult
+
+        async def _track_usage(event: str, data: dict[str, Any]) -> HookResult:
+            usage = data.get("usage", {})
+            session.status.total_input_tokens += (
+                usage.get("input", 0)
+                + usage.get("cache_read", 0)
+                + usage.get("cache_write", 0)
+            )
+            session.status.total_output_tokens += usage.get("output", 0)
+            return HookResult(action="continue", data=data)
+
+        session.coordinator.hooks.register("llm:response", _track_usage)
+
         # Register mention resolver
         resolver = BaseMentionResolver(base_path=Path(cwd))
         session.coordinator.register_capability("mention_resolver", resolver)
