@@ -256,11 +256,27 @@ def build_provider_config_for_model(
 
     # Build provider config — merge entry's config with model override
     config = dict(entry.config)
-    config["default_model"] = model
+
+    # Native provider modules (anthropic, openai) use model names WITHOUT
+    # the provider prefix (e.g. "claude-opus-4-6" not "anthropic/claude-opus-4-6").
+    # litellm uses the full prefixed name (e.g. "anthropic/claude-opus-4-6").
+    # Strip the prefix for native providers, keep it for litellm.
+    provider_model = model
+    if entry.module != "provider-litellm" and "/" in model:
+        # Strip provider prefix for native modules
+        provider_model = model.split("/", 1)[1]
+
+    config["default_model"] = provider_model
     config["priority"] = 0  # Highest priority — this is the routed provider
 
-    return {
+    result: dict[str, Any] = {
         "module": entry.module,
-        "source": entry.source,
         "config": config,
     }
+
+    # Always include source — the module resolver needs it to find or activate
+    # the module, even if it's already installed in the venv.
+    if entry.source:
+        result["source"] = entry.source
+
+    return result

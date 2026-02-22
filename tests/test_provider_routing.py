@@ -157,7 +157,8 @@ class TestBuildProviderConfig:
         config = build_provider_config_for_model("anthropic/claude-opus-4-6", table)
         assert config is not None
         assert config["module"] == "provider-anthropic"
-        assert config["config"]["default_model"] == "anthropic/claude-opus-4-6"
+        # Native providers get the model name WITHOUT prefix
+        assert config["config"]["default_model"] == "claude-opus-4-6"
         assert config["config"]["priority"] == 0
 
     def test_returns_litellm_for_unknown(self):
@@ -165,7 +166,25 @@ class TestBuildProviderConfig:
         config = build_provider_config_for_model("ollama/llama3.2", table)
         assert config is not None
         assert config["module"] == "provider-litellm"
+        # litellm keeps the full prefixed model name
         assert config["config"]["default_model"] == "ollama/llama3.2"
+
+    def test_native_provider_strips_prefix(self):
+        """Native providers (anthropic, openai) get model name without provider prefix."""
+        table = load_routing_table(DEFAULT_PROVIDER_ROUTING)
+        # Anthropic
+        config = build_provider_config_for_model("anthropic/claude-sonnet-4-5", table)
+        assert config["config"]["default_model"] == "claude-sonnet-4-5"
+        # OpenAI
+        config = build_provider_config_for_model("openai/gpt-4o", table)
+        assert config["config"]["default_model"] == "gpt-4o"
+
+    def test_litellm_keeps_full_model_name(self):
+        """litellm needs the full provider/model format."""
+        table = load_routing_table(DEFAULT_PROVIDER_ROUTING)
+        for model in ["gemini/gemini-2.5-flash", "xai/grok-3", "groq/llama-3.3-70b"]:
+            config = build_provider_config_for_model(model, table)
+            assert config["config"]["default_model"] == model
 
     def test_merges_entry_config(self):
         """Extra config from routing entry should be merged."""
@@ -180,7 +199,7 @@ class TestBuildProviderConfig:
         config = build_provider_config_for_model("anthropic/claude-opus-4-6", table)
         assert config["config"]["enable_prompt_caching"] is True
         assert config["config"]["enable_1m_context"] is True
-        assert config["config"]["default_model"] == "anthropic/claude-opus-4-6"
+        assert config["config"]["default_model"] == "claude-opus-4-6"  # prefix stripped for native
 
     def test_returns_none_with_empty_table(self):
         config = build_provider_config_for_model("anything", [])
