@@ -44,10 +44,9 @@ def _setup_handlers(
     from amplifier_app_openclaw.automation.recipes import register_recipe_handlers
     register_recipe_handlers(rpc_reader, writer=writer)
 
-    # Register LLM passthrough handlers for provider-openclaw
-    from amplifier_app_openclaw.llm_handler import handle_llm_complete, handle_list_models
-    rpc_reader.register("openclaw/llm_complete", handle_llm_complete)
-    rpc_reader.register("openclaw/list_models", handle_list_models)
+    # NOTE: LLM passthrough (provider-openclaw, llm_handler) has been replaced
+    # by provider routing + provider-litellm.  Model selection now happens at
+    # session creation time via --model flag and provider_routing.py.
 
     return session_manager
 
