@@ -190,13 +190,31 @@ class SessionManager:
             # Deep-copy mount_plan so we don't mutate the cached PreparedBundle
             mount_plan = copy.deepcopy(prepared.mount_plan)
             session_section = mount_plan.get("session", {})
-            session_section["context"] = {
+
+            # Resolve the installed path for context-persistent so the module
+            # loader's lazy activation can find it (the BundleModuleResolver
+            # only knows about modules in the original bundle).
+            context_persistent_source = None
+            try:
+                import amplifier_module_context_persistent
+                import os
+                mod_file = getattr(amplifier_module_context_persistent, "__file__", None)
+                if mod_file:
+                    context_persistent_source = os.path.dirname(mod_file)
+            except ImportError:
+                pass
+
+            context_config: dict[str, Any] = {
                 "module": "context-persistent",
                 "config": {
                     "transcript_path": str(transcript_path),
                     "max_tokens": 200000,
                 },
             }
+            if context_persistent_source:
+                context_config["source"] = context_persistent_source
+
+            session_section["context"] = context_config
             mount_plan["session"] = session_section
 
             # Create session directly with modified mount_plan

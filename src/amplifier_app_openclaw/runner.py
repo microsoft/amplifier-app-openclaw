@@ -76,6 +76,8 @@ async def run_task(
       - error: str — error message
       - error_type: str — exception class name
     """
+    import os
+
     from amplifier_foundation import load_bundle
     from amplifier_foundation.mentions import BaseMentionResolver
 
@@ -125,13 +127,29 @@ async def run_task(
             # Deep-copy mount_plan to avoid mutating the cached PreparedBundle
             mount_plan = copy.deepcopy(prepared.mount_plan)
             session_section = mount_plan.get("session", {})
-            session_section["context"] = {
+
+            # Resolve installed path for context-persistent so the module
+            # loader can find it via lazy activation
+            context_persistent_source = None
+            try:
+                import amplifier_module_context_persistent
+                mod_file = getattr(amplifier_module_context_persistent, "__file__", None)
+                if mod_file:
+                    context_persistent_source = os.path.dirname(mod_file)
+            except ImportError:
+                pass
+
+            context_config = {
                 "module": "context-persistent",
                 "config": {
                     "transcript_path": str(transcript_path),
                     "max_tokens": 200000,
                 },
             }
+            if context_persistent_source:
+                context_config["source"] = context_persistent_source
+
+            session_section["context"] = context_config
             mount_plan["session"] = session_section
 
             from amplifier_core import AmplifierSession
