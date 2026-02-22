@@ -4,8 +4,27 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import time
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from amplifier_foundation import Bundle
+
+# Chat overlay: composed onto every bundle so the agent knows it's in a
+# messaging context.  Because compose() uses "later overrides earlier" for
+# instruction, we put the overlay *first* so the bundle's own instruction
+# takes precedence.
+CHAT_OVERLAY = Bundle(
+    name="_chat_overlay",
+    instruction=(
+        "You are assisting a user through a messaging interface "
+        "(WhatsApp, Telegram, Discord, etc.). Keep responses concise "
+        "and focused. Avoid verbose explanations unless specifically "
+        "asked. Use short paragraphs. Skip unnecessary preamble."
+    ),
+)
 
 
 class AutoDenyApproval:
@@ -60,9 +79,12 @@ async def run_task(
     from amplifier_app_openclaw.spawn import CLISpawnManager
 
     session = None
+    session_id = str(uuid.uuid4())
+    start_time = time.monotonic()
     try:
         # Load and prepare bundle
         bundle = await load_bundle(bundle_name)
+        bundle = CHAT_OVERLAY.compose(bundle)
         prepared = await bundle.prepare(install_deps=True)
 
         # Create session with CLI-appropriate adapters
@@ -89,10 +111,30 @@ async def run_task(
             )
         except asyncio.TimeoutError:
             await session.coordinator.request_cancel()
-            response = "[Task timed out]"
+            from amplifier_app_openclaw.errors import make_timeout_result
 
-        # Collect status and usage
+            return make_timeout_result(session=session)
+
+        # Collect status and usage; log cost
         cost = session.status.estimated_cost if session.status.estimated_cost is not None else 0.0
+        duration = time.monotonic() - start_time
+
+        try:
+            from amplifier_app_openclaw.cost import CostEntry, log_cost_entry
+
+            log_cost_entry(CostEntry(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                session_id=session_id,
+                bundle=bundle_name,
+                input_tokens=session.status.total_input_tokens or 0,
+                output_tokens=session.status.total_output_tokens or 0,
+                estimated_cost=cost,
+                duration_seconds=round(duration, 2),
+                task_summary=prompt[:200],
+            ))
+        except Exception:
+            pass  # Don't fail the run if cost logging fails
+
         return {
             "response": response,
             "usage": {
@@ -105,7 +147,9 @@ async def run_task(
         }
 
     except Exception as e:
-        return {"error": str(e), "error_type": type(e).__name__}
+        from amplifier_app_openclaw.errors import map_error
+
+        return map_error(e)
 
     finally:
         if session is not None:

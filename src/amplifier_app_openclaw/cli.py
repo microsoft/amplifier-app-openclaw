@@ -22,6 +22,22 @@ def cli(ctx: click.Context) -> None:
 
 
 @cli.command()
+def serve() -> None:
+    """Start the JSON-RPC sidecar bridge (stdin/stdout).
+
+    Emits a bridge/ready notification on startup, then reads JSON-RPC
+    requests from stdin and writes responses to stdout until shutdown
+    or EOF.
+    """
+    from amplifier_app_openclaw.serve import run_serve
+
+    try:
+        asyncio.run(run_serve())
+    except KeyboardInterrupt:
+        pass
+
+
+@cli.command()
 @click.argument("prompt")
 @click.option("--bundle", default="foundation", show_default=True, help="Bundle name to load.")
 @click.option("--cwd", default=".", show_default=True, help="Working directory for the session.")
@@ -44,6 +60,17 @@ def run(prompt: str, bundle: str, cwd: str, timeout: int) -> None:
         print("\n[info] Interrupted", file=sys.stderr)
 
     click.echo(json.dumps(result, indent=2))
+
+
+@cli.command()
+@click.option("--period", default="day", type=click.Choice(["day", "week", "month", "all"]), show_default=True, help="Time period to report on.")
+@click.option("--session", "session_id", default=None, help="Filter by session ID.")
+def cost(period: str, session_id: str | None) -> None:
+    """Show cost/usage report as JSON."""
+    from amplifier_app_openclaw.cost import generate_cost_report
+
+    report = generate_cost_report(period=period, session_id=session_id)
+    click.echo(json.dumps(report, indent=2))
 
 
 # ---------------------------------------------------------------------------
