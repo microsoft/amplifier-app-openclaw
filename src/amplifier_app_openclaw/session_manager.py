@@ -19,6 +19,7 @@ from amplifier_foundation import Bundle, load_bundle
 from amplifier_foundation.mentions import BaseMentionResolver
 
 from amplifier_app_openclaw.adapters.approval import OpenClawApprovalSystem
+from amplifier_app_openclaw.injection import InjectionManager
 from amplifier_app_openclaw.adapters.display import OpenClawDisplaySystem
 from amplifier_app_openclaw.adapters.streaming import OpenClawStreamingHook
 from amplifier_app_openclaw.cost import CostEntry, generate_cost_report, log_cost_entry
@@ -67,6 +68,7 @@ class SessionState:
     streaming_hook: OpenClawStreamingHook
     spawn_manager: OpenClawSpawnManager
     display_system: OpenClawDisplaySystem
+    injection_manager: InjectionManager = field(default_factory=InjectionManager)
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -244,6 +246,14 @@ class SessionManager:
         streaming_hook = OpenClawStreamingHook(session_id, self._writer)
         streaming_hook.register(session)
 
+        # Register injection hook for mid-execution message injection
+        injection_manager = InjectionManager()
+        session.coordinator.hooks.register(
+            "provider:request",
+            injection_manager.hook_handler,
+            name="injection_manager",
+        )
+
         # Register mention resolver
         resolver = BaseMentionResolver(base_path=Path(cwd))
         session.coordinator.register_capability("mention_resolver", resolver)
@@ -264,11 +274,15 @@ class SessionManager:
             streaming_hook=streaming_hook,
             spawn_manager=spawn_manager,
             display_system=display_system,
+            injection_manager=injection_manager,
             metadata={
                 "bundle": bundle_name,
                 "cwd": cwd,
                 "created_at": time.time(),
                 "status": "ready",
+                "persistent": persistent,
+                "session_name": session_name,
+                "resumed": is_resumed,
             },
         )
 
@@ -280,7 +294,41 @@ class SessionManager:
             "session_id": session_id,
             "agents": agents,
             "tools": tool_names,
+            "persistent": persistent,
+            "resumed": is_resumed,
         }
+
+    async def handle_resume(self, params: dict[str, Any]) -> Any:
+        """Handle ``session/resume``.
+
+        Convenience method to resume a previously-persisted session.
+
+        Params:
+            session_id: str — the session ID to resume
+            bundle: str — bundle name/path
+            cwd: str (optional)
+
+        Returns:
+            Same as session/create with resumed=True.
+        """
+        session_id = params.get("session_id", "")
+        bundle = params.get("bundle", "")
+        if not session_id:
+            raise ValueError("Missing required param: session_id")
+        if not bundle:
+            raise ValueError("Missing required param: bundle")
+
+        session_dir = _PERSISTENT_SESSIONS_DIR / session_id
+        if not (session_dir / "context-messages.jsonl").exists():
+            raise ValueError(f"No saved session found: {session_id}")
+
+        return await self.handle_create({
+            "bundle": bundle,
+            "session_id": session_id,
+            "persistent": True,
+            "_is_resumed": True,
+            "cwd": params.get("cwd", str(Path.cwd())),
+        })
 
     async def handle_execute(self, params: dict[str, Any]) -> Any:
         """Handle ``session/execute``.
@@ -351,6 +399,34 @@ class SessionManager:
             },
             "status": state.metadata["status"],
         }
+
+    async def handle_inject(self, params: dict[str, Any]) -> Any:
+        """Handle ``session/inject``.
+
+        Enqueue a user message for injection into the next LLM call of an
+        actively executing session.
+
+        Params:
+            session_id: str
+            message: str — text to inject
+
+        Returns:
+            status, session_id
+        """
+        session_id = params.get("session_id", "")
+        message = params.get("message", "")
+        if not message:
+            raise ValueError("Missing required param: message")
+
+        state = self._sessions.get(session_id)
+        if state is None:
+            raise ValueError(f"Unknown session: {session_id}")
+
+        if state.metadata.get("status") != "executing":
+            raise RuntimeError("Session not currently executing")
+
+        await state.injection_manager.inject(message)
+        return {"status": "injected", "session_id": session_id}
 
     async def handle_cancel(self, params: dict[str, Any]) -> Any:
         """Handle ``session/cancel``.
@@ -587,7 +663,9 @@ class SessionManager:
         """Register all JSON-RPC handlers on the given JsonRpcReader."""
         # Session lifecycle
         rpc_reader.register("session/create", self.handle_create)
+        rpc_reader.register("session/resume", self.handle_resume)
         rpc_reader.register("session/execute", self.handle_execute)
+        rpc_reader.register("session/inject", self.handle_inject)
         rpc_reader.register("session/cancel", self.handle_cancel)
         rpc_reader.register("session/cleanup", self.handle_cleanup)
         rpc_reader.register("session/list", self.handle_list)

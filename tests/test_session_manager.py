@@ -297,6 +297,7 @@ class TestHandlerRegistration:
         expected = {
             "session/create", "session/execute", "session/cancel",
             "session/cleanup", "session/list", "session/approval_response",
+            "session/inject", "session/resume",
             "bundle/list", "bundle/add",
             "augment/evaluate_tool", "augment/cost_report", "augment/query_context",
         }
