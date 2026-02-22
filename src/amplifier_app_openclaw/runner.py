@@ -87,6 +87,10 @@ async def run_task(
         bundle = CHAT_OVERLAY.compose(bundle)
         prepared = await bundle.prepare(install_deps=True)
 
+        # Inject user-configured providers from ~/.amplifier/settings.yaml
+        # (mirrors what amplifier-app-cli does via inject_user_providers)
+        _inject_user_providers(prepared)
+
         # Create session with CLI-appropriate adapters
         session = await prepared.create_session(
             approval_system=AutoDenyApproval(),
@@ -157,3 +161,65 @@ async def run_task(
                 await session.cleanup()
             except Exception:
                 pass
+
+
+def _inject_user_providers(prepared: Any) -> None:
+    """Read provider config from ~/.amplifier/settings.yaml and inject into bundle.
+
+    This mirrors amplifier-app-cli's inject_user_providers() — the app layer
+    provides the provider policy while the bundle provides the mechanism.
+    Only injects if the bundle has no providers already defined.
+    """
+    import os
+    import re
+
+    try:
+        import yaml
+    except ImportError:
+        return  # pyyaml not available, skip
+
+    settings_path = Path.home() / ".amplifier" / "settings.yaml"
+    if not settings_path.exists():
+        return
+
+    try:
+        with open(settings_path) as f:
+            settings = yaml.safe_load(f) or {}
+    except Exception:
+        return
+
+    providers_config = settings.get("config", {}).get("providers", [])
+    if not providers_config:
+        return
+
+    # Only inject if bundle has no providers
+    if prepared.mount_plan.get("providers"):
+        return
+
+    # Resolve environment variables in provider config
+    resolved = []
+    for provider in providers_config:
+        resolved_provider = _resolve_env_vars(provider)
+        resolved.append(resolved_provider)
+
+    prepared.mount_plan["providers"] = resolved
+
+
+def _resolve_env_vars(obj: Any) -> Any:
+    """Recursively resolve ${ENV_VAR} references in config values."""
+    import os
+    import re
+
+    if isinstance(obj, str):
+        def _replacer(m: re.Match) -> str:
+            # Return env value if set, empty string if not (don't keep ${...} literal)
+            return os.environ.get(m.group(1), "")
+        resolved = re.sub(r"\$\{(\w+)\}", _replacer, obj)
+        # If the entire value was just an unset env var, return None
+        # so the provider SDK uses its default
+        return resolved if resolved else None
+    elif isinstance(obj, dict):
+        return {k: v for k, v in ((k, _resolve_env_vars(v)) for k, v in obj.items()) if v is not None}
+    elif isinstance(obj, list):
+        return [_resolve_env_vars(v) for v in obj]
+    return obj

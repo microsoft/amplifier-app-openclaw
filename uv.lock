@@ -10,6 +10,7 @@ dependencies = [
     { name = "amplifier-core" },
     { name = "amplifier-foundation" },
     { name = "click" },
+    { name = "pyyaml" },
 ]
 
 [package.optional-dependencies]
@@ -25,6 +26,7 @@ requires-dist = [
     { name = "click", specifier = ">=8.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21" },
+    { name = "pyyaml", specifier = ">=6.0" },
 ]
 provides-extras = ["dev"]
 

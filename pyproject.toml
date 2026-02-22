@@ -12,6 +12,7 @@ dependencies = [
     "amplifier-core>=1.0.0",
     "amplifier-foundation>=1.0.0",
     "click>=8.0",
+    "pyyaml>=6.0",
 ]
 
 [tool.uv.sources]
