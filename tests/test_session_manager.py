@@ -295,6 +295,6 @@ class TestHandlerRegistration:
             "session/create", "session/execute", "session/cancel",
             "session/cleanup", "session/list", "session/approval_response",
             "bundle/list", "bundle/add",
-            "augment/evaluate_tool", "augment/cost_report",
+            "augment/evaluate_tool", "augment/cost_report", "augment/query_context",
         }
         assert expected == registered

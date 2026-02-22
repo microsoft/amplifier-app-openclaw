@@ -152,7 +152,7 @@ class SessionManager:
         # Mount OpenClaw tools
         tools = create_openclaw_tools(self._writer, self._response_reader)
         for tool in tools:
-            await session.coordinator.mount("tools", tool)
+            await session.coordinator.mount("tools", tool, name=tool.name)
 
         # Track session
         self._sessions[session_id] = SessionState(
@@ -384,6 +384,40 @@ class SessionManager:
         session_id = params.get("session_id")
         return generate_cost_report(period=period, session_id=session_id)
 
+    async def handle_query_context(self, params: dict[str, Any]) -> Any:
+        """Handle ``augment/query_context``.
+
+        Creates a lightweight ephemeral session with the foundation bundle,
+        executes the query, and returns the response. Simplified version for
+        Phase 1 — Phase 1.5 adds agent-specific routing.
+
+        Params:
+            query: str — the question to answer
+            bundle: str (optional, default "foundation") — bundle to use
+        """
+        query = params.get("query")
+        if not query:
+            return {"error": "query is required"}
+        bundle_name = params.get("bundle", "foundation")
+        try:
+            result = await self.handle_create({"bundle": bundle_name, "cwd": "."})
+            session_id = result["session_id"]
+            try:
+                exec_result = await self.handle_execute({
+                    "session_id": session_id,
+                    "prompt": query,
+                    "timeout": 60,
+                })
+                return {
+                    "response": exec_result.get("response", ""),
+                    "source": bundle_name,
+                    "usage": exec_result.get("usage", {}),
+                }
+            finally:
+                await self.handle_cleanup({"session_id": session_id})
+        except Exception as exc:
+            return {"error": str(exc), "source": bundle_name}
+
     # -- Clean shutdown --------------------------------------------------------
 
     async def cleanup_all(self) -> None:
@@ -413,3 +447,4 @@ class SessionManager:
         # Augmentation
         rpc_reader.register("augment/evaluate_tool", self.handle_evaluate_tool)
         rpc_reader.register("augment/cost_report", self.handle_cost_report)
+        rpc_reader.register("augment/query_context", self.handle_query_context)
