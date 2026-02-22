@@ -22,19 +22,25 @@ def cli(ctx: click.Context) -> None:
 
 
 @cli.command()
-def serve() -> None:
-    """Start the JSON-RPC sidecar bridge (stdin/stdout).
+@click.option("--socket", "socket_path", default=None, help="Listen on a Unix socket instead of stdin/stdout.")
+def serve(socket_path: str | None) -> None:
+    """Start the JSON-RPC sidecar bridge.
 
-    Emits a bridge/ready notification on startup, then reads JSON-RPC
-    requests from stdin and writes responses to stdout until shutdown
-    or EOF.
+    By default, communicates via stdin/stdout (for subprocess invocation).
+    With --socket, listens on a Unix domain socket for persistent sidecar mode.
     """
-    from amplifier_app_openclaw.serve import run_serve
-
-    try:
-        asyncio.run(run_serve())
-    except KeyboardInterrupt:
-        pass
+    if socket_path is not None:
+        from amplifier_app_openclaw.serve import run_serve_socket
+        try:
+            asyncio.run(run_serve_socket(socket_path if socket_path else None))
+        except KeyboardInterrupt:
+            pass
+    else:
+        from amplifier_app_openclaw.serve import run_serve
+        try:
+            asyncio.run(run_serve())
+        except KeyboardInterrupt:
+            pass
 
 
 @cli.command()

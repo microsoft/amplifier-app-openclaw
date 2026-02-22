@@ -93,6 +93,10 @@ class SessionManager:
         bundle = CHAT_OVERLAY.compose(bundle)
         prepared = await bundle.prepare(install_deps=True)
 
+        # Inject user-configured providers from ~/.amplifier/settings.yaml
+        from amplifier_app_openclaw.runner import _inject_user_providers
+        _inject_user_providers(prepared)
+
         self._bundle_cache[bundle_name] = prepared
         logger.info("Bundle cached: %s (cache size: %d/%d)", bundle_name, len(self._bundle_cache), self._max_bundles)
         return prepared
