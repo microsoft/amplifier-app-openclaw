@@ -96,9 +96,10 @@ class TestBundleCache:
 
         with patch("amplifier_app_openclaw.session_manager.load_bundle", new=AsyncMock(return_value=MagicMock())):
             with patch("amplifier_app_openclaw.session_manager.CHAT_OVERLAY") as overlay:
-                overlay.compose.return_value = mock_bundle
+                with patch("amplifier_app_openclaw.runner._inject_user_providers"):
+                    overlay.compose.return_value = mock_bundle
 
-                await mgr._get_or_prepare_bundle("newest")
+                    await mgr._get_or_prepare_bundle("newest")
 
         # 'old' should be evicted (LRU)
         assert "old" not in mgr._bundle_cache
@@ -112,15 +113,17 @@ class TestBundleCache:
         mgr._bundle_cache["b"] = "b_prep"
 
         # Access 'a' to make it most recently used
-        await mgr._get_or_prepare_bundle("a")
+        with patch("amplifier_app_openclaw.runner._inject_user_providers"):
+            await mgr._get_or_prepare_bundle("a")
 
         mock_bundle = MagicMock()
         mock_bundle.prepare = AsyncMock(return_value="c_prep")
 
         with patch("amplifier_app_openclaw.session_manager.load_bundle", new=AsyncMock(return_value=MagicMock())):
             with patch("amplifier_app_openclaw.session_manager.CHAT_OVERLAY") as overlay:
-                overlay.compose.return_value = mock_bundle
-                await mgr._get_or_prepare_bundle("c")
+                with patch("amplifier_app_openclaw.runner._inject_user_providers"):
+                    overlay.compose.return_value = mock_bundle
+                    await mgr._get_or_prepare_bundle("c")
 
         # 'b' should be evicted since 'a' was touched
         assert "a" in mgr._bundle_cache
