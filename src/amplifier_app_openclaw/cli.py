@@ -17,7 +17,7 @@ from amplifier_app_openclaw import __version__
 @click.pass_context
 def cli(ctx: click.Context) -> None:
     """Amplifier × OpenClaw integration CLI."""
-    if ctx.invoked_subcommand is None and not ctx.protected_params:
+    if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
 
 
