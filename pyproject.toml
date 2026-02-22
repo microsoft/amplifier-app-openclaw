@@ -10,9 +10,13 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "amplifier-core>=1.0.0",
-    "amplifier-foundation>=2.0.0",
+    "amplifier-foundation>=1.0.0",
     "click>=8.0",
 ]
+
+[tool.uv.sources]
+amplifier-core = { git = "https://github.com/microsoft/amplifier-core", branch = "main" }
+amplifier-foundation = { git = "https://github.com/microsoft/amplifier-foundation", branch = "main" }
 
 [project.scripts]
 amplifier-openclaw = "amplifier_app_openclaw.cli:cli"
