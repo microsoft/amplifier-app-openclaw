@@ -257,14 +257,12 @@ def build_provider_config_for_model(
     # Build provider config — merge entry's config with model override
     config = dict(entry.config)
 
-    # Native provider modules (anthropic, openai) use model names WITHOUT
-    # the provider prefix (e.g. "claude-opus-4-6" not "anthropic/claude-opus-4-6").
-    # litellm uses the full prefixed name (e.g. "anthropic/claude-opus-4-6").
-    # Strip the prefix for native providers, keep it for litellm.
-    provider_model = model
-    if entry.module != "provider-litellm" and "/" in model:
-        # Strip provider prefix for native modules
-        provider_model = model.split("/", 1)[1]
+    # Normalize model names for the target provider module:
+    # 1. Native providers (anthropic, openai) use names WITHOUT prefix
+    #    (e.g. "claude-opus-4-6" not "anthropic/claude-opus-4-6")
+    # 2. litellm uses its own prefix conventions which may differ from OpenClaw's
+    #    (e.g. OpenClaw uses "google/" but litellm uses "gemini/")
+    provider_model = _normalize_model_for_provider(model, entry.module)
 
     config["default_model"] = provider_model
     config["priority"] = 0  # Highest priority — this is the routed provider
@@ -280,3 +278,46 @@ def build_provider_config_for_model(
         result["source"] = entry.source
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Model name normalization
+# ---------------------------------------------------------------------------
+
+# OpenClaw and litellm use different provider prefixes for some providers.
+# This map translates OpenClaw prefixes → litellm prefixes.
+_OPENCLAW_TO_LITELLM_PREFIX: dict[str, str] = {
+    "google": "gemini",
+    # Add more as needed:
+    # "azure": "azure",
+}
+
+
+def _normalize_model_for_provider(model: str, module: str) -> str:
+    """Normalize a model name for the target Amplifier provider module.
+
+    - Native providers (anthropic, openai): strip prefix entirely
+      ("anthropic/claude-opus-4-6" → "claude-opus-4-6")
+    - litellm: translate OpenClaw prefixes to litellm conventions
+      ("google/gemini-3-pro-preview" → "gemini/gemini-3-pro-preview")
+    - vLLM/OpenAI-compat: keep as-is or strip depending on provider
+
+    Args:
+        model: Full model string from OpenClaw (e.g. "google/gemini-3-pro-preview").
+        module: Target Amplifier module ID (e.g. "provider-litellm").
+
+    Returns:
+        Normalized model name for the target provider.
+    """
+    if "/" not in model:
+        return model
+
+    prefix, model_name = model.split("/", 1)
+
+    if module == "provider-litellm":
+        # Translate OpenClaw prefixes to litellm prefixes
+        litellm_prefix = _OPENCLAW_TO_LITELLM_PREFIX.get(prefix, prefix)
+        return f"{litellm_prefix}/{model_name}"
+    else:
+        # Native providers: strip prefix
+        return model_name

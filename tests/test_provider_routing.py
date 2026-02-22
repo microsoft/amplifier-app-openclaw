@@ -186,6 +186,20 @@ class TestBuildProviderConfig:
             config = build_provider_config_for_model(model, table)
             assert config["config"]["default_model"] == model
 
+    def test_google_prefix_translated_to_gemini(self):
+        """OpenClaw uses google/ but litellm expects gemini/."""
+        table = load_routing_table(DEFAULT_PROVIDER_ROUTING)
+        config = build_provider_config_for_model("google/gemini-3-pro-preview", table)
+        assert config["module"] == "provider-litellm"
+        assert config["config"]["default_model"] == "gemini/gemini-3-pro-preview"
+
+    def test_vllm_prefix_passes_through(self):
+        """vLLM models should pass through to litellm as-is."""
+        table = load_routing_table(DEFAULT_PROVIDER_ROUTING)
+        config = build_provider_config_for_model("vllm/qwen3-coder-next", table)
+        assert config["module"] == "provider-litellm"
+        assert config["config"]["default_model"] == "vllm/qwen3-coder-next"
+
     def test_merges_entry_config(self):
         """Extra config from routing entry should be merged."""
         table = load_routing_table([
