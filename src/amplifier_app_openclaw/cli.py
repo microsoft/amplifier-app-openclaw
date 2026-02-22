@@ -46,12 +46,13 @@ def serve(socket_path: str | None) -> None:
 @cli.command()
 @click.argument("prompt")
 @click.option("--bundle", default="foundation", show_default=True, help="Bundle name to load.")
+@click.option("--model", default=None, help="Model to use (e.g. anthropic/claude-opus-4-6). Auto-routes to best Amplifier provider.")
 @click.option("--cwd", default=".", show_default=True, help="Working directory for the session.")
 @click.option("--timeout", default=300, show_default=True, type=int, help="Timeout in seconds.")
 @click.option("--persistent", is_flag=True, default=False, help="Enable session persistence (requires context-persistent module).")
 @click.option("--session-name", default=None, help="Name for the session (enables deterministic session ID for later resumption).")
 @click.option("--resume", "resume_session", is_flag=True, default=False, help="Resume a named session instead of creating a new one.")
-def run(prompt: str, bundle: str, cwd: str, timeout: int, persistent: bool, session_name: str | None, resume_session: bool) -> None:
+def run(prompt: str, bundle: str, model: str | None, cwd: str, timeout: int, persistent: bool, session_name: str | None, resume_session: bool) -> None:
     """Run a single prompt through an Amplifier session.
 
     Outputs JSON to stdout with the session result.
@@ -69,6 +70,8 @@ def run(prompt: str, bundle: str, cwd: str, timeout: int, persistent: bool, sess
     from amplifier_app_openclaw.runner import run_task
 
     extra = ""
+    if model:
+        extra += f" model={model!r}"
     if persistent:
         extra += f" persistent=True"
     if session_name:
@@ -83,6 +86,7 @@ def run(prompt: str, bundle: str, cwd: str, timeout: int, persistent: bool, sess
             cwd=cwd,
             timeout=timeout,
             prompt=prompt,
+            model=model,
             persistent=persistent,
             session_name=session_name,
             resume=resume_session,

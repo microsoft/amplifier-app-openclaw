@@ -61,6 +61,7 @@ async def run_task(
     cwd: str,
     timeout: int,
     prompt: str,
+    model: str | None = None,
     persistent: bool = False,
     session_name: str | None = None,
     resume: bool = False,
@@ -109,6 +110,29 @@ async def run_task(
         # Inject user-configured providers from ~/.amplifier/settings.yaml
         # (mirrors what amplifier-app-cli does via inject_user_providers)
         _inject_user_providers(prepared)
+
+        # Route model to the best Amplifier provider module
+        if model:
+            from amplifier_app_openclaw.provider_routing import build_provider_config_for_model
+            routed = build_provider_config_for_model(model)
+            if routed:
+                # Inject routed provider into mount plan (priority 0 = highest)
+                if "providers" not in prepared.mount_plan:
+                    prepared.mount_plan["providers"] = []
+                # Check if this module is already in the list
+                existing_idx = next(
+                    (i for i, p in enumerate(prepared.mount_plan["providers"])
+                     if p.get("module") == routed["module"]),
+                    None,
+                )
+                if existing_idx is not None:
+                    # Update existing entry with routing config
+                    existing = prepared.mount_plan["providers"][existing_idx]
+                    existing.setdefault("config", {}).update(routed["config"])
+                else:
+                    # Add routed provider
+                    prepared.mount_plan["providers"].insert(0, routed)
+                logger.info("Provider routing: injected %s for model %s", routed["module"], model)
 
         # Handle persistence
         if persistent and not _context_persistent_available():
