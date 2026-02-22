@@ -11,6 +11,9 @@ requires-python = ">=3.11"
 dependencies = [
     "amplifier-core>=1.0.0",
     "amplifier-foundation>=1.0.0",
+    "amplifier-module-hooks-streaming-ui>=1.0.0",
+    "amplifier-module-tool-mcp>=0.2.0",
+    "amplifier-module-tool-web>=1.0.0",
     "click>=8.0",
     "pyyaml>=6.0",
 ]
@@ -18,6 +21,9 @@ dependencies = [
 [tool.uv.sources]
 amplifier-core = { git = "https://github.com/microsoft/amplifier-core", branch = "main" }
 amplifier-foundation = { git = "https://github.com/microsoft/amplifier-foundation", branch = "main" }
+amplifier-module-hooks-streaming-ui = { git = "https://github.com/microsoft/amplifier-module-hooks-streaming-ui", branch = "main" }
+amplifier-module-tool-mcp = { git = "https://github.com/microsoft/amplifier-module-tool-mcp", branch = "main" }
+amplifier-module-tool-web = { git = "https://github.com/microsoft/amplifier-module-tool-web", branch = "main" }
 
 [project.scripts]
 amplifier-openclaw = "amplifier_app_openclaw.cli:cli"
