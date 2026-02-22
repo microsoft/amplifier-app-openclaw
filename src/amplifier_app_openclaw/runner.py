@@ -61,6 +61,9 @@ async def run_task(
     cwd: str,
     timeout: int,
     prompt: str,
+    persistent: bool = False,
+    session_name: str | None = None,
+    resume: bool = False,
 ) -> dict[str, Any]:
     """Execute a single Amplifier task and return structured results.
 
@@ -78,8 +81,22 @@ async def run_task(
 
     from amplifier_app_openclaw.spawn import CLISpawnManager
 
+    import copy
+    from amplifier_app_openclaw.session_manager import (
+        _deterministic_session_id,
+        _context_persistent_available,
+        _PERSISTENT_SESSIONS_DIR,
+    )
+
     session = None
-    session_id = str(uuid.uuid4())
+    is_resumed = False
+
+    # Determine session ID
+    if session_name:
+        session_id = _deterministic_session_id(bundle_name, session_name)
+    else:
+        session_id = str(uuid.uuid4())
+
     start_time = time.monotonic()
     try:
         # Load and prepare bundle
@@ -91,12 +108,53 @@ async def run_task(
         # (mirrors what amplifier-app-cli does via inject_user_providers)
         _inject_user_providers(prepared)
 
-        # Create session with CLI-appropriate adapters
-        session = await prepared.create_session(
-            approval_system=AutoDenyApproval(),
-            display_system=StderrDisplay(),
-            session_cwd=Path(cwd),
-        )
+        # Handle persistence
+        if persistent and not _context_persistent_available():
+            logger.warning("context-persistent module not available; falling back to non-persistent")
+            persistent = False
+
+        session_dir = _PERSISTENT_SESSIONS_DIR / session_id
+        transcript_path = session_dir / "context-messages.jsonl"
+
+        if persistent and (resume or transcript_path.exists()):
+            is_resumed = True
+            if resume and not transcript_path.exists():
+                raise RuntimeError(f"No saved session found for session name: {session_name}")
+
+        if persistent:
+            # Deep-copy mount_plan to avoid mutating the cached PreparedBundle
+            mount_plan = copy.deepcopy(prepared.mount_plan)
+            session_section = mount_plan.get("session", {})
+            session_section["context"] = {
+                "module": "context-persistent",
+                "config": {
+                    "transcript_path": str(transcript_path),
+                    "max_tokens": 200000,
+                },
+            }
+            mount_plan["session"] = session_section
+
+            from amplifier_core import AmplifierSession
+            session = AmplifierSession(
+                mount_plan,
+                session_id=session_id,
+                approval_system=AutoDenyApproval(),
+                display_system=StderrDisplay(),
+                is_resumed=is_resumed,
+            )
+            await session.coordinator.mount("module-source-resolver", prepared.resolver)
+            if hasattr(prepared, "bundle_package_paths") and prepared.bundle_package_paths:
+                session.coordinator.register_capability(
+                    "bundle_package_paths", list(prepared.bundle_package_paths)
+                )
+            await session.initialize()
+        else:
+            # Standard non-persistent path
+            session = await prepared.create_session(
+                approval_system=AutoDenyApproval(),
+                display_system=StderrDisplay(),
+                session_cwd=Path(cwd),
+            )
 
         # Register a hook to accumulate token usage from provider responses
         from amplifier_core.hooks import HookResult

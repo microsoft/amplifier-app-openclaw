@@ -137,6 +137,7 @@ source = { editable = "." }
 dependencies = [
     { name = "amplifier-core" },
     { name = "amplifier-foundation" },
+    { name = "amplifier-module-context-persistent" },
     { name = "amplifier-module-hooks-streaming-ui" },
     { name = "amplifier-module-tool-mcp" },
     { name = "amplifier-module-tool-web" },
@@ -154,6 +155,7 @@ dev = [
 requires-dist = [
     { name = "amplifier-core", git = "https://github.com/microsoft/amplifier-core?branch=main" },
     { name = "amplifier-foundation", git = "https://github.com/microsoft/amplifier-foundation?branch=main" },
+    { name = "amplifier-module-context-persistent", git = "https://github.com/microsoft/amplifier-module-context-persistent?branch=main" },
     { name = "amplifier-module-hooks-streaming-ui", git = "https://github.com/microsoft/amplifier-module-hooks-streaming-ui?branch=main" },
     { name = "amplifier-module-tool-mcp", git = "https://github.com/microsoft/amplifier-module-tool-mcp?branch=main" },
     { name = "amplifier-module-tool-web", git = "https://github.com/microsoft/amplifier-module-tool-web?branch=main" },
@@ -184,6 +186,19 @@ dependencies = [
     { name = "amplifier-core" },
     { name = "pyyaml" },
 ]
+
+[[package]]
+name = "amplifier-module-context-persistent"
+version = "0.1.0"
+source = { git = "https://github.com/microsoft/amplifier-module-context-persistent?branch=main#bfcac28adce614f29ec38b731d4c2b8c36120d0f" }
+dependencies = [
+    { name = "amplifier-module-context-simple" },
+]
+
+[[package]]
+name = "amplifier-module-context-simple"
+version = "1.0.0"
+source = { git = "https://github.com/microsoft/amplifier-module-context-simple?rev=main#e702dcc6417fa1fb3254aa73c800842143a1d47b" }
 
 [[package]]
 name = "amplifier-module-hooks-streaming-ui"

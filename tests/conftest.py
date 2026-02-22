@@ -34,6 +34,7 @@ if "amplifier_core" not in sys.modules:
             self.action = action
 
     ac.ToolResult = _ToolResult
+    ac.AmplifierSession = MagicMock
 
     # Also need amplifier_core.models for HookResult
     acm = _make_mock_module("amplifier_core.models")
@@ -69,6 +70,12 @@ if "amplifier_foundation.registry" not in sys.modules:
 if "amplifier_foundation.bundle" not in sys.modules:
     bundle_mod = _make_mock_module("amplifier_foundation.bundle")
     bundle_mod.PreparedBundle = MagicMock
+
+if "amplifier_module_context_persistent" not in sys.modules:
+    _make_mock_module("amplifier_module_context_persistent")
+
+if "amplifier_module_context_simple" not in sys.modules:
+    _make_mock_module("amplifier_module_context_simple")
 
 if "amplifier_foundation.mentions" not in sys.modules:
     mentions = _make_mock_module("amplifier_foundation.mentions")

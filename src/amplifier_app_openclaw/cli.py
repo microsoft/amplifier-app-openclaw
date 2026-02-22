@@ -48,19 +48,45 @@ def serve(socket_path: str | None) -> None:
 @click.option("--bundle", default="foundation", show_default=True, help="Bundle name to load.")
 @click.option("--cwd", default=".", show_default=True, help="Working directory for the session.")
 @click.option("--timeout", default=300, show_default=True, type=int, help="Timeout in seconds.")
-def run(prompt: str, bundle: str, cwd: str, timeout: int) -> None:
+@click.option("--persistent", is_flag=True, default=False, help="Enable session persistence (requires context-persistent module).")
+@click.option("--session-name", default=None, help="Name for the session (enables deterministic session ID for later resumption).")
+@click.option("--resume", "resume_session", is_flag=True, default=False, help="Resume a named session instead of creating a new one.")
+def run(prompt: str, bundle: str, cwd: str, timeout: int, persistent: bool, session_name: str | None, resume_session: bool) -> None:
     """Run a single prompt through an Amplifier session.
 
     Outputs JSON to stdout with the session result.
     """
     os.environ["NO_COLOR"] = "1"
 
+    if resume_session and not session_name:
+        click.echo("Error: --resume requires --session-name", err=True)
+        sys.exit(1)
+
+    # If --session-name is provided, implicitly enable persistence
+    if session_name:
+        persistent = True
+
     from amplifier_app_openclaw.runner import run_task
 
-    print(f"[info] Running prompt with bundle={bundle!r} cwd={cwd!r} timeout={timeout}", file=sys.stderr)
+    extra = ""
+    if persistent:
+        extra += f" persistent=True"
+    if session_name:
+        extra += f" session_name={session_name!r}"
+    if resume_session:
+        extra += f" resume=True"
+    print(f"[info] Running prompt with bundle={bundle!r} cwd={cwd!r} timeout={timeout}{extra}", file=sys.stderr)
 
     try:
-        result = asyncio.run(run_task(bundle_name=bundle, cwd=cwd, timeout=timeout, prompt=prompt))
+        result = asyncio.run(run_task(
+            bundle_name=bundle,
+            cwd=cwd,
+            timeout=timeout,
+            prompt=prompt,
+            persistent=persistent,
+            session_name=session_name,
+            resume=resume_session,
+        ))
     except KeyboardInterrupt:
         result = {"error": "Cancelled by user", "error_type": "KeyboardInterrupt"}
         print("\n[info] Interrupted", file=sys.stderr)
