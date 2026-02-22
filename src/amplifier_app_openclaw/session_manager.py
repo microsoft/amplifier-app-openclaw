@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import copy
+import hashlib
 import logging
 import os
 import time
@@ -37,6 +39,23 @@ logger = logging.getLogger(__name__)
 # Defaults (Pi-friendly)
 _DEFAULT_MAX_BUNDLES = 2
 _DEFAULT_MAX_SESSIONS = 2
+
+# Persistent session storage root
+_PERSISTENT_SESSIONS_DIR = Path.home() / ".openclaw" / "amplifier" / "sessions"
+
+
+def _deterministic_session_id(bundle_name: str, session_name: str) -> str:
+    """Generate a deterministic session ID from bundle + session name."""
+    return hashlib.sha256(f"{bundle_name}:{session_name}".encode()).hexdigest()[:16]
+
+
+def _context_persistent_available() -> bool:
+    """Check if context-persistent module is importable."""
+    try:
+        import amplifier_module_context_persistent  # noqa: F401
+        return True
+    except ImportError:
+        return False
 
 
 @dataclass
@@ -74,6 +93,10 @@ class SessionManager:
         # Governance engine for tool evaluation
         self._governance = GovernanceEngine()
 
+        # Query result cache
+        from amplifier_app_openclaw.context_router import QueryCache
+        self._query_cache = QueryCache()
+
     # -- Bundle cache ----------------------------------------------------------
 
     async def _get_or_prepare_bundle(self, bundle_name: str) -> Any:
@@ -109,9 +132,13 @@ class SessionManager:
         Params:
             bundle: str — bundle name/path
             cwd: str (optional) — session working directory
+            session_name: str (optional) — named session for deterministic ID
+            persistent: bool (optional) — enable session persistence
+            session_id: str (optional) — explicit session ID (for resume)
+            _is_resumed: bool (internal) — whether this is a resumed session
 
         Returns:
-            session_id, agents (list), tools (list)
+            session_id, agents (list), tools (list), persistent (bool), resumed (bool)
         """
         bundle_name = params.get("bundle", "")
         if not bundle_name:
@@ -123,7 +150,18 @@ class SessionManager:
                 "Clean up an existing session first."
             )
 
-        session_id = str(uuid.uuid4())
+        persistent = params.get("persistent", False)
+        session_name = params.get("session_name")
+        is_resumed = params.get("_is_resumed", False)
+
+        # Determine session ID
+        if params.get("session_id"):
+            session_id = params["session_id"]
+        elif session_name:
+            session_id = _deterministic_session_id(bundle_name, session_name)
+        else:
+            session_id = str(uuid.uuid4())
+
         cwd = params.get("cwd", str(Path.cwd()))
 
         # Load / cache bundle
@@ -133,13 +171,59 @@ class SessionManager:
         approval_system = OpenClawApprovalSystem(session_id, self._writer)
         display_system = OpenClawDisplaySystem(session_id, self._writer)
 
-        # Create session
-        session = await prepared.create_session(
-            session_id=session_id,
-            approval_system=approval_system,
-            display_system=display_system,
-            session_cwd=Path(cwd),
-        )
+        # Determine if we should use persistence
+        session_dir = _PERSISTENT_SESSIONS_DIR / session_id
+        transcript_path = session_dir / "context-messages.jsonl"
+
+        if persistent and not _context_persistent_available():
+            logger.warning("context-persistent module not available; falling back to non-persistent")
+            persistent = False
+
+        # Auto-detect resume: if persistent and transcript already exists
+        if persistent and not is_resumed and transcript_path.exists():
+            is_resumed = True
+            logger.info("Existing session storage found for %s; resuming", session_id)
+
+        if persistent:
+            # Deep-copy mount_plan so we don't mutate the cached PreparedBundle
+            mount_plan = copy.deepcopy(prepared.mount_plan)
+            session_section = mount_plan.get("session", {})
+            session_section["context"] = {
+                "module": "context-persistent",
+                "config": {
+                    "transcript_path": str(transcript_path),
+                    "max_tokens": 200000,
+                },
+            }
+            mount_plan["session"] = session_section
+
+            # Create session directly with modified mount_plan
+            from amplifier_core import AmplifierSession
+
+            session = AmplifierSession(
+                mount_plan,
+                session_id=session_id,
+                approval_system=approval_system,
+                display_system=display_system,
+                is_resumed=is_resumed,
+            )
+            await session.coordinator.mount("module-source-resolver", prepared.resolver)
+
+            if hasattr(prepared, "bundle_package_paths") and prepared.bundle_package_paths:
+                session.coordinator.register_capability(
+                    "bundle_package_paths", list(prepared.bundle_package_paths)
+                )
+
+            await session.initialize()
+        else:
+            # Standard non-persistent path
+            session = await prepared.create_session(
+                session_id=session_id,
+                approval_system=approval_system,
+                display_system=display_system,
+                session_cwd=Path(cwd),
+                is_resumed=is_resumed,
+            )
 
         # Register a hook to accumulate token usage from provider responses
         from amplifier_core.hooks import HookResult
@@ -403,21 +487,63 @@ class SessionManager:
         session_id = params.get("session_id")
         return generate_cost_report(period=period, session_id=session_id)
 
+    def _find_session_by_bundle(self, bundle_name: str) -> str | None:
+        """Find an existing ready session using the given bundle."""
+        for sid, state in self._sessions.items():
+            if (state.metadata.get("bundle") == bundle_name
+                    and state.metadata.get("status") == "ready"):
+                return sid
+        return None
+
     async def handle_query_context(self, params: dict[str, Any]) -> Any:
         """Handle ``augment/query_context``.
 
-        Creates a lightweight ephemeral session with the foundation bundle,
-        executes the query, and returns the response. Simplified version for
-        Phase 1 — Phase 1.5 adds agent-specific routing.
+        Routes queries to appropriate agents/bundles based on query type,
+        reuses existing sessions when possible, and caches results.
 
         Params:
             query: str — the question to answer
-            bundle: str (optional, default "foundation") — bundle to use
+            bundle: str (optional) — override bundle (skips routing)
         """
         query = params.get("query")
         if not query:
             return {"error": "query is required"}
-        bundle_name = params.get("bundle", "foundation")
+
+        # Check cache first
+        cached = self._query_cache.get(query)
+        if cached is not None:
+            return {**cached, "cached": True}
+
+        # Route the query
+        from amplifier_app_openclaw.context_router import route_query
+        bundle_name, agent_hint = route_query(query)
+
+        # Override with explicit bundle if provided
+        bundle_name = params.get("bundle", bundle_name)
+
+        # Local handling for cost queries
+        if bundle_name is None:
+            return await self.handle_cost_report(params)
+
+        # Try to reuse an existing session with matching bundle
+        existing = self._find_session_by_bundle(bundle_name)
+        if existing:
+            result = await self.handle_execute({
+                "session_id": existing,
+                "prompt": query,
+                "timeout": 60,
+            })
+            response = {
+                "response": result.get("response", ""),
+                "source": bundle_name,
+                "agent": agent_hint,
+                "usage": result.get("usage", {}),
+                "reused_session": True,
+            }
+            self._query_cache.put(query, response)
+            return response
+
+        # Create ephemeral session
         try:
             result = await self.handle_create({"bundle": bundle_name, "cwd": "."})
             session_id = result["session_id"]
@@ -427,14 +553,22 @@ class SessionManager:
                     "prompt": query,
                     "timeout": 60,
                 })
-                return {
+                response = {
                     "response": exec_result.get("response", ""),
                     "source": bundle_name,
+                    "agent": agent_hint,
                     "usage": exec_result.get("usage", {}),
                 }
+                self._query_cache.put(query, response)
+                return response
             finally:
                 await self.handle_cleanup({"session_id": session_id})
         except Exception as exc:
+            # Fallback to foundation if preferred bundle fails
+            if bundle_name != "foundation":
+                return await self.handle_query_context({
+                    "query": query, "bundle": "foundation"
+                })
             return {"error": str(exc), "source": bundle_name}
 
     # -- Clean shutdown --------------------------------------------------------
