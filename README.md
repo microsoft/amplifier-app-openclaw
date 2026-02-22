@@ -2,45 +2,53 @@
 
 **OpenClaw is where your AI lives. Amplifier is how your AI thinks.**
 
-`amplifier-app-openclaw` is the integration layer that connects [OpenClaw](https://github.com/openclaw) — a personal AI agent runtime — with [Microsoft Amplifier](https://github.com/microsoft/amplifier-core), a framework for composable AI agent behaviors called "bundles." It provides a CLI (and eventually a JSON-RPC sidecar) that lets OpenClaw delegate complex, long-running tasks to specialized Amplifier agents — things like deep research, multi-step coding, data analysis, and structured problem-solving — while keeping the lightweight conversational agent fast and responsive.
+`amplifier-app-openclaw` integrates [OpenClaw](https://github.com/openclaw/openclaw) — a personal AI agent runtime — with [Microsoft Amplifier](https://github.com/microsoft/amplifier-core), a framework for composable AI agent behaviors. It lets OpenClaw delegate complex tasks to Amplifier agents while automatically routing to the best LLM provider for each model.
+
+## Key Features
+
+- **Provider Routing** — Automatically matches any LLM model to the best Amplifier provider module. Native providers (Anthropic, OpenAI) get full features (thinking, caching, tool repair); everything else falls through to litellm.
+- **100+ LLM Providers** — Any model OpenClaw has configured works automatically via [provider-litellm](https://github.com/bkrabach/amplifier-module-provider-litellm). No Amplifier-specific API keys needed.
+- **Composable Bundles** — Amplifier's modular bundles (foundation, superpowers, coder, etc.) work out of the box.
+- **Session Persistence** — Resume named sessions across invocations.
+- **JSON-RPC Sidecar** — Persistent bridge for bidirectional OpenClaw ↔ Amplifier communication.
 
 ## Installation
 
 Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-# Clone the repository
 git clone https://github.com/bkrabach/amplifier-app-openclaw.git
 cd amplifier-app-openclaw
-
-# Install with uv (handles all dependencies including git sources)
 uv sync
-
-# Verify installation
 uv run amplifier-openclaw --version
 ```
 
 ## Quick Start
 
-Set your API key and run a task:
-
 ```bash
-export OPENAI_API_KEY="sk-..."
-# or
+# Set at least one API key
 export ANTHROPIC_API_KEY="sk-ant-..."
 
-# Run a simple prompt
-uv run amplifier-openclaw run "What are the three laws of thermodynamics?"
+# Run with default provider (auto-detected from settings)
+uv run amplifier-openclaw run "Explain the three laws of thermodynamics"
+
+# Run with a specific model — routing picks the best provider automatically
+uv run amplifier-openclaw run --model anthropic/claude-opus-4-6 "Deep analysis of this codebase"
+uv run amplifier-openclaw run --model gemini/gemini-2.5-flash "Quick summary of recent changes"
+uv run amplifier-openclaw run --model xai/grok-3 "What's happening in AI today?"
+
+# Use a specific bundle
+uv run amplifier-openclaw run --bundle superpowers "Research quantum computing advances"
 ```
 
-Output is structured JSON on stdout (status messages go to stderr):
+Output is structured JSON on stdout (status on stderr):
 
 ```json
 {
   "response": "The three laws of thermodynamics are...",
   "usage": {
-    "input_tokens": 42,
-    "output_tokens": 256,
+    "input_tokens": 28566,
+    "output_tokens": 129,
     "estimated_cost": 0.003,
     "tool_invocations": 0
   },
@@ -48,130 +56,166 @@ Output is structured JSON on stdout (status messages go to stderr):
 }
 ```
 
-## CLI Reference
+## Provider Routing
 
-### `amplifier-openclaw`
+When you specify `--model`, the routing table matches it to the best Amplifier provider module:
 
-Top-level command group. Shows help when called without a subcommand.
+| Model Pattern | Provider Module | Features |
+|---|---|---|
+| `anthropic/claude-opus-*` | provider-anthropic | Extended thinking, prompt caching, 1M context, tool repair |
+| `anthropic/claude-sonnet-*` | provider-anthropic | Extended thinking, prompt caching, 1M context |
+| `anthropic/claude-haiku-*` | provider-anthropic | Fast inference, prompt caching |
+| `openai/gpt-4o*` | provider-openai | Responses API, reasoning |
+| `openai/o3*`, `openai/o4*` | provider-openai | Responses API, reasoning |
+| `gemini/*` | provider-litellm | Via litellm (env vars) |
+| `ollama/*` | provider-litellm | Local models, no API key needed |
+| `groq/*`, `xai/*`, `openrouter/*` | provider-litellm | Via litellm (env vars) |
+| `*` (anything else) | provider-litellm | Universal fallback |
 
-```bash
-amplifier-openclaw --help
-amplifier-openclaw --version
+First match wins. Native providers get full provider-specific features. litellm covers the long tail (100+ providers via standard environment variables).
+
+### Extending the Routing Table
+
+Add custom provider modules via `~/.amplifier/openclaw-provider-routing.yaml`:
+
+```yaml
+provider_routing:
+  # Community Mistral provider with native function calling
+  - module: provider-mistral
+    source: git+https://github.com/someone/amplifier-module-provider-mistral
+    models:
+      - "mistral/*"
 ```
+
+User entries are prepended to the default table (higher priority). Same module IDs replace defaults.
+
+## CLI Reference
 
 ### `amplifier-openclaw run`
 
-Run a single prompt through an Amplifier session. Outputs JSON to stdout.
-
 ```bash
-# Basic usage
-amplifier-openclaw run "Summarize the key ideas in this codebase"
-
-# Specify a bundle
-amplifier-openclaw run --bundle foundation "List 5 creative project ideas"
-
-# Custom working directory and timeout
-amplifier-openclaw run --cwd /path/to/project --timeout 600 "Refactor the auth module"
+amplifier-openclaw run [OPTIONS] PROMPT
 ```
 
 | Option | Default | Description |
 |---|---|---|
-| `--bundle` | `foundation` | Bundle name to load |
+| `--model` | (from settings) | Model to use (e.g. `anthropic/claude-opus-4-6`). Auto-routes to best provider. |
+| `--bundle` | `foundation` | Amplifier bundle to load |
 | `--cwd` | `.` | Working directory for the session |
 | `--timeout` | `300` | Timeout in seconds |
+| `--persistent` | off | Enable session persistence |
+| `--session-name` | (none) | Named session (implies `--persistent`) |
+| `--resume` | off | Resume a named session |
 
-### `amplifier-openclaw bundles list`
+### `amplifier-openclaw serve`
 
-List all registered bundles as JSON.
+Start the JSON-RPC sidecar for persistent OpenClaw integration.
 
 ```bash
-# List all bundles
-amplifier-openclaw bundles list
+# Unix socket mode (for sidecar)
+amplifier-openclaw serve --socket /tmp/amplifier.sock
 
-# Root bundles only (no sub-behaviors)
-amplifier-openclaw bundles list --root-only
+# Stdin/stdout mode (for subprocess invocation)
+amplifier-openclaw serve
 ```
 
-### `amplifier-openclaw bundles add`
-
-Add a bundle from a git URI or local path.
+### `amplifier-openclaw bundles`
 
 ```bash
-# From a git repository
-amplifier-openclaw bundles add git+https://github.com/org/my-bundle@main
-
-# From a local directory
-amplifier-openclaw bundles add ./my-local-bundle
+amplifier-openclaw bundles list [--root-only]
+amplifier-openclaw bundles add SOURCE
 ```
 
-## Available Bundles
-
-Bundles are Amplifier's unit of composable agent behavior. Key bundles available through `amplifier-foundation`:
-
-| Bundle | Description |
-|---|---|
-| `foundation` | General-purpose reasoning agent (default) |
-| `coder` | Code generation, refactoring, and debugging |
-| `researcher` | Deep research with web search and synthesis |
-| `writer` | Long-form content creation and editing |
-
-Use `amplifier-openclaw bundles list` to see all registered bundles in your environment.
-
-## Configuration
-
-### Environment Variables
-
-| Variable | Required | Description |
-|---|---|---|
-| `OPENAI_API_KEY` | One of these | OpenAI API key |
-| `ANTHROPIC_API_KEY` | required | Anthropic API key |
-| `AMPLIFIER_MODEL` | No | Override the default model |
-| `NO_COLOR` | No | Set automatically in CLI mode to disable color output |
-
-### API Keys
-
-At least one LLM API key must be set. The bundle determines which provider is used — `foundation` typically uses whichever key is available.
-
-## Phase Roadmap
-
-| Phase | Focus | Status |
-|---|---|---|
-| **Phase 0** | CLI (`amplifier-openclaw run`) — single-shot task execution, JSON output, cost tracking | ✅ Current |
-| **Phase 1** | JSON-RPC sidecar (`amplifier-openclaw serve`) — persistent process, session management, OpenClaw tool integration | 🔜 Next |
-| **Phase 1.5** | Advanced features — streaming, multi-agent delegation, approval flows | 📋 Planned |
-| **Phase 2** | Native integration — embedded Python runtime, zero-overhead calls | 💭 Future |
-
-## Development Setup
+### `amplifier-openclaw cost`
 
 ```bash
-# Clone and install
+amplifier-openclaw cost [--period day|week|month|all] [--session ID]
+```
+
+## Architecture
+
+```
+OpenClaw agent
+  │
+  ├─ amplifier-openclaw run --model gemini/gemini-2.5-flash "task"
+  │     │
+  │     ├─ provider_routing.py    → fnmatch model → provider module
+  │     ├─ runner.py              → load bundle, create session, execute
+  │     └─ provider-litellm      → litellm.acompletion() → Gemini API
+  │
+  ├─ amplifier-openclaw serve --socket /tmp/amp.sock
+  │     │
+  │     ├─ session_manager.py     → JSON-RPC session lifecycle
+  │     ├─ tools/                 → OpenClaw tools (browser, message, memory, devices, cron)
+  │     └─ automation/            → Recipe execution
+  │
+  └─ JSON output → OpenClaw parses response + usage
+```
+
+### Provider Routing Flow
+
+```
+"anthropic/claude-opus-4-6"
+  → routing table: anthropic/claude-opus-* matches
+    → provider-anthropic (full thinking, caching, 1M context)
+      → Anthropic API (using ANTHROPIC_API_KEY from env)
+
+"gemini/gemini-2.5-flash"
+  → routing table: no specific match
+    → * matches → provider-litellm
+      → litellm.acompletion() (using GEMINI_API_KEY from env)
+
+"ollama/llama3.2"
+  → routing table: no specific match
+    → * matches → provider-litellm
+      → litellm.acompletion() (using OLLAMA_API_BASE from env)
+      → No API key needed, no cost
+```
+
+## Development
+
+```bash
 git clone https://github.com/bkrabach/amplifier-app-openclaw.git
 cd amplifier-app-openclaw
 uv sync
 
-# Run tests
-uv run pytest tests/
+# Run tests (232 passing)
+uv run python -m pytest tests/ -v
 
-# Run a specific test file
-uv run pytest tests/test_cli.py -v
-
-# Run with integration tests (requires API keys)
-uv run pytest tests/ -m integration
+# Run specific test suite
+uv run python -m pytest tests/test_provider_routing.py -v
 ```
 
 ### Project Structure
 
 ```
 src/amplifier_app_openclaw/
-├── __init__.py          # Package version
-├── cli.py               # Click CLI entry point
-├── runner.py            # Session lifecycle (load → execute → cleanup)
-├── spawn.py             # Agent delegation stub (Phase 0)
-├── adapters/            # OpenClaw-specific adapters
-├── automation/          # Automation utilities
-└── tools/               # Tool integrations
+├── cli.py                  # Click CLI entry point
+├── runner.py               # Session lifecycle (load → execute → cleanup)
+├── provider_routing.py     # Model → provider module resolution
+├── serve.py                # JSON-RPC sidecar
+├── session_manager.py      # Session lifecycle over RPC
+├── spawn.py                # Agent delegation
+├── cost.py                 # Usage/cost tracking
+├── adapters/               # Protocol adapters (display, approval, streaming, spawn)
+├── automation/             # Recipe execution
+├── modules/                # Amplifier modules (tool-openclaw)
+│   └── tool_openclaw.py    # OpenClaw tools as Amplifier tools
+└── tools/                  # Tool bridge implementations
+    ├── browser.py
+    ├── cron.py
+    ├── devices.py
+    ├── memory.py
+    └── message.py
 ```
+
+## Related Projects
+
+- **[amplifier-core](https://github.com/microsoft/amplifier-core)** — Amplifier's kernel: session lifecycle, module loading, coordinator
+- **[amplifier-foundation](https://github.com/microsoft/amplifier-foundation)** — Bundle system, spawn utilities, module resolution
+- **[amplifier-module-provider-litellm](https://github.com/bkrabach/amplifier-module-provider-litellm)** — Universal LLM provider via litellm (100+ providers)
+- **[OpenClaw](https://github.com/openclaw/openclaw)** — Personal AI agent runtime
 
 ## License
 
-TBD
+MIT
