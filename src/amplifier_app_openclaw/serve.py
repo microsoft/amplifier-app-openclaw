@@ -44,6 +44,11 @@ def _setup_handlers(
     from amplifier_app_openclaw.automation.recipes import register_recipe_handlers
     register_recipe_handlers(rpc_reader, writer=writer)
 
+    # Register LLM passthrough handlers for provider-openclaw
+    from amplifier_app_openclaw.llm_handler import handle_llm_complete, handle_list_models
+    rpc_reader.register("openclaw/llm_complete", handle_llm_complete)
+    rpc_reader.register("openclaw/list_models", handle_list_models)
+
     return session_manager
 
 
