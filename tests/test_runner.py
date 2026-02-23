@@ -65,6 +65,7 @@ class TestRunTask:
     def _patches(self, bundle):
         """Return context managers patching the lazy imports inside run_task."""
         return (
+            patch("amplifier_app_openclaw.runner._ensure_bundle_registered", new_callable=AsyncMock),
             patch("amplifier_foundation.load_bundle", new_callable=AsyncMock, return_value=bundle),
             patch("amplifier_foundation.mentions.BaseMentionResolver", MagicMock()),
             patch("amplifier_app_openclaw.cost.log_cost_entry"),
@@ -73,8 +74,8 @@ class TestRunTask:
     @pytest.mark.asyncio
     async def test_happy_path(self):
         bundle, session = self._make_mocks()
-        p1, p2, p3 = self._patches(bundle)
-        with p1, p2, p3:
+        p0, p1, p2, p3 = self._patches(bundle)
+        with p0, p1, p2, p3:
             result = await run_task(bundle_name="foundation", cwd=".", timeout=300, prompt="hello")
 
         assert result["response"] == "The answer is 42"
@@ -85,8 +86,8 @@ class TestRunTask:
     @pytest.mark.asyncio
     async def test_json_output_structure(self):
         bundle, _ = self._make_mocks()
-        p1, p2, p3 = self._patches(bundle)
-        with p1, p2, p3:
+        p0, p1, p2, p3 = self._patches(bundle)
+        with p0, p1, p2, p3:
             result = await run_task(bundle_name="foundation", cwd=".", timeout=300, prompt="test")
 
         assert set(result.keys()) == {"response", "usage", "status"}
@@ -110,7 +111,8 @@ class TestRunTask:
 
     @pytest.mark.asyncio
     async def test_error_wrapping(self):
-        with patch("amplifier_foundation.load_bundle", new_callable=AsyncMock, side_effect=RuntimeError("boom")):
+        with patch("amplifier_app_openclaw.runner._ensure_bundle_registered", new_callable=AsyncMock), \
+             patch("amplifier_foundation.load_bundle", new_callable=AsyncMock, side_effect=RuntimeError("boom")):
             result = await run_task(bundle_name="bad", cwd=".", timeout=300, prompt="fail")
 
         assert "error" in result
@@ -120,8 +122,8 @@ class TestRunTask:
     async def test_none_cost_defaults_to_zero(self):
         bundle, session = self._make_mocks()
         session.status.estimated_cost = None
-        p1, p2, p3 = self._patches(bundle)
-        with p1, p2, p3:
+        p0, p1, p2, p3 = self._patches(bundle)
+        with p0, p1, p2, p3:
             result = await run_task(bundle_name="foundation", cwd=".", timeout=300, prompt="test")
 
         assert result["usage"]["estimated_cost"] == 0.0

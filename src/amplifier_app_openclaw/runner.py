@@ -59,6 +59,31 @@ class StderrDisplay:
         print(f"[{level}] {message}", file=sys.stderr)
 
 
+# Well-known bundles and their git sources — mirrors amplifier-app-cli's discovery.
+_WELL_KNOWN_BUNDLES: dict[str, str] = {
+    "foundation": "git+https://github.com/microsoft/amplifier-foundation@main",
+    "superpowers": "git+https://github.com/microsoft/amplifier-bundle-superpowers@main#subdirectory=behaviors/superpowers-methodology.yaml",
+}
+
+
+async def _ensure_bundle_registered(bundle_name: str) -> None:
+    """Register a well-known bundle if it's not in the registry yet."""
+    from amplifier_foundation import BundleRegistry
+
+    registry = BundleRegistry()
+    try:
+        registry.get(bundle_name)
+        return  # Already registered
+    except Exception:
+        pass
+
+    source = _WELL_KNOWN_BUNDLES.get(bundle_name)
+    if source:
+        logger.info("Bootstrapping bundle '%s' from %s", bundle_name, source)
+        registry.add(bundle_name, source)
+    # If not well-known, let load_bundle handle the error
+
+
 async def run_task(
     bundle_name: str,
     cwd: str,
@@ -105,6 +130,10 @@ async def run_task(
 
     start_time = time.monotonic()
     try:
+        # Bootstrap well-known bundles if not registered yet.
+        # On a fresh machine, the bundle registry is empty.
+        await _ensure_bundle_registered(bundle_name)
+
         # Load and prepare bundle
         bundle = await load_bundle(bundle_name)
         bundle = CHAT_OVERLAY.compose(bundle)
