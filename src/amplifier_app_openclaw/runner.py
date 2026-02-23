@@ -280,6 +280,7 @@ async def run_task(
         }
 
     except Exception as e:
+        logger.exception("Task execution failed")
         from amplifier_app_openclaw.errors import map_error
 
         return map_error(e)
