@@ -80,7 +80,7 @@ async def _ensure_bundle_registered(bundle_name: str) -> None:
     source = _WELL_KNOWN_BUNDLES.get(bundle_name)
     if source:
         logger.info("Bootstrapping bundle '%s' from %s", bundle_name, source)
-        registry.add(bundle_name, source)
+        registry.register({bundle_name: source})
     # If not well-known, let load_bundle handle the error
 
 
