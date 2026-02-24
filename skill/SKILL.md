@@ -59,7 +59,7 @@ exec command:"amplifier-openclaw run --model anthropic/claude-sonnet-4-20250514 
 # Gemini — fast, large context
 exec command:"amplifier-openclaw run --model gemini/gemini-2.5-flash 'Quick analysis' --bundle foundation" background:true timeout:300
 
-# Any model OpenClaw has configured works automatically
+# Any model works
 exec command:"amplifier-openclaw run --model xai/grok-3 'Research task'" background:true timeout:600
 ```
 
