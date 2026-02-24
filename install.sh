@@ -2,14 +2,14 @@
 # install.sh — One-command installer for amplifier-openclaw
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/bkrabach/amplifier-app-openclaw/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/microsoft/amplifier-app-openclaw/main/install.sh | bash
 #
 # Prerequisites: none (installs uv if missing)
 # Result: amplifier-openclaw binary on PATH
 
 set -euo pipefail
 
-REPO="https://github.com/bkrabach/amplifier-app-openclaw"
+REPO="https://github.com/microsoft/amplifier-app-openclaw"
 PACKAGE="amplifier-app-openclaw @ git+${REPO}@main"
 BIN="amplifier-openclaw"
 

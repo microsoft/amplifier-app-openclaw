@@ -23,7 +23,7 @@ dependencies = [
 [tool.uv.sources]
 amplifier-core = { git = "https://github.com/microsoft/amplifier-core", branch = "main" }
 amplifier-foundation = { git = "https://github.com/microsoft/amplifier-foundation", branch = "main" }
-amplifier-module-provider-litellm = { git = "https://github.com/bkrabach/amplifier-module-provider-litellm", branch = "main" }
+amplifier-module-provider-litellm = { git = "https://github.com/microsoft/amplifier-module-provider-litellm", branch = "main" }
 amplifier-module-hooks-streaming-ui = { git = "https://github.com/microsoft/amplifier-module-hooks-streaming-ui", branch = "main" }
 amplifier-module-context-persistent = { git = "https://github.com/microsoft/amplifier-module-context-persistent", branch = "main" }
 amplifier-module-tool-mcp = { git = "https://github.com/microsoft/amplifier-module-tool-mcp", branch = "main" }

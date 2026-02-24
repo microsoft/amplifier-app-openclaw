@@ -7,7 +7,7 @@
 ## Key Features
 
 - **Provider Routing** — Automatically matches any LLM model to the best Amplifier provider module. Native providers (Anthropic, OpenAI) get full features (thinking, caching, tool repair); everything else falls through to litellm.
-- **100+ LLM Providers** — Any model OpenClaw has configured works automatically via [provider-litellm](https://github.com/bkrabach/amplifier-module-provider-litellm). No Amplifier-specific API keys needed.
+- **100+ LLM Providers** — Any model OpenClaw has configured works automatically via [provider-litellm](https://github.com/microsoft/amplifier-module-provider-litellm). No Amplifier-specific API keys needed.
 - **Composable Bundles** — Amplifier's modular bundles (foundation, superpowers, coder, etc.) work out of the box.
 - **Session Persistence** — Resume named sessions across invocations.
 - **JSON-RPC Sidecar** — Persistent bridge for bidirectional OpenClaw ↔ Amplifier communication.
@@ -17,7 +17,7 @@
 Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-git clone https://github.com/bkrabach/amplifier-app-openclaw.git
+git clone https://github.com/microsoft/amplifier-app-openclaw.git
 cd amplifier-app-openclaw
 uv sync
 uv run amplifier-openclaw --version
@@ -175,7 +175,7 @@ OpenClaw agent
 ## Development
 
 ```bash
-git clone https://github.com/bkrabach/amplifier-app-openclaw.git
+git clone https://github.com/microsoft/amplifier-app-openclaw.git
 cd amplifier-app-openclaw
 uv sync
 
@@ -213,7 +213,7 @@ src/amplifier_app_openclaw/
 
 - **[amplifier-core](https://github.com/microsoft/amplifier-core)** — Amplifier's kernel: session lifecycle, module loading, coordinator
 - **[amplifier-foundation](https://github.com/microsoft/amplifier-foundation)** — Bundle system, spawn utilities, module resolution
-- **[amplifier-module-provider-litellm](https://github.com/bkrabach/amplifier-module-provider-litellm)** — Universal LLM provider via litellm (100+ providers)
+- **[amplifier-module-provider-litellm](https://github.com/microsoft/amplifier-module-provider-litellm)** — Universal LLM provider via litellm (100+ providers)
 - **[OpenClaw](https://github.com/openclaw/openclaw)** — Personal AI agent runtime
 
 ## License

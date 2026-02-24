@@ -26,7 +26,7 @@ Routing config example (in amplifier-openclaw settings):
           - "openai/o3*"
           - "openai/o4*"
       - module: provider-litellm
-        source: git+https://github.com/bkrabach/amplifier-module-provider-litellm@main
+        source: git+https://github.com/microsoft/amplifier-module-provider-litellm@main
         models:
           - "*"
 """
@@ -68,7 +68,7 @@ DEFAULT_PROVIDER_ROUTING: list[dict[str, Any]] = [
     },
     {
         "module": "provider-litellm",
-        "source": "git+https://github.com/bkrabach/amplifier-module-provider-litellm@main",
+        "source": "git+https://github.com/microsoft/amplifier-module-provider-litellm@main",
         "models": [
             "*",
         ],
