@@ -6,7 +6,7 @@ metadata:
     "openclaw":
       {
         "emoji": "⚡",
-        "requires": { "bins": ["amplifier-openclaw", "socat", "timeout", "nohup"] },
+        "requires": { "bins": ["amplifier-openclaw"] },
         "install":
           [
             {
@@ -75,7 +75,7 @@ The `--model` flag auto-routes to the best provider:
 | `openai/gpt-4o*`, `openai/o3*` | provider-openai | Responses API, reasoning |
 | Everything else | provider-litellm | 100+ providers via env vars |
 
-No separate API keys needed — Amplifier inherits whatever OpenClaw has configured. **Note:** This means the Amplifier CLI/sidecar has access to all provider API keys present in your OpenClaw environment.
+No separate API keys needed — Amplifier inherits whatever OpenClaw has configured.
 
 ### Bundles
 
