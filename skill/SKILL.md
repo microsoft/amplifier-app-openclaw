@@ -75,7 +75,6 @@ The `--model` flag auto-routes to the best provider:
 | `openai/gpt-4o*`, `openai/o3*` | provider-openai | Responses API, reasoning |
 | Everything else | provider-litellm | 100+ providers via env vars |
 
-No separate API keys needed — Amplifier inherits whatever OpenClaw has configured.
 
 ### Bundles
 
