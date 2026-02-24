@@ -50,24 +50,13 @@ exec command:"amplifier-openclaw run 'Research the top 3 Python web frameworks' 
 
 ### With Model Selection
 
-Pass `--model` to use a specific LLM. The router automatically picks the best Amplifier provider:
+Pass `--model` to override the default model:
 
 ```bash
-# Anthropic — full thinking, caching, tool repair
-exec command:"amplifier-openclaw run --model anthropic/claude-sonnet-4-20250514 'Deep code review' --bundle foundation" background:true timeout:600
-
-# Gemini — fast, large context
-exec command:"amplifier-openclaw run --model gemini/gemini-2.5-flash 'Quick analysis' --bundle foundation" background:true timeout:300
-
-# Any model works
-exec command:"amplifier-openclaw run --model xai/grok-3 'Research task'" background:true timeout:600
+exec command:"amplifier-openclaw run --model your-preferred-model 'Deep code review' --bundle foundation" background:true timeout:600
 ```
 
-**Tip:** If OpenClaw is using a specific model, pass it through with `--model` so Amplifier uses the same one.
-
-### Model Support
-
-The `--model` flag accepts any model identifier (e.g. `anthropic/claude-sonnet-4-20250514`, `openai/gpt-4o`, `gemini/gemini-2.5-flash`). The CLI automatically routes to the appropriate provider.
+**Tip:** Pass `--model` matching the model from your OpenClaw Runtime line so Amplifier uses the same one.
 
 
 ### Bundles
