@@ -158,7 +158,7 @@ requires-dist = [
     { name = "amplifier-foundation", git = "https://github.com/microsoft/amplifier-foundation?branch=main" },
     { name = "amplifier-module-context-persistent", git = "https://github.com/microsoft/amplifier-module-context-persistent?branch=main" },
     { name = "amplifier-module-hooks-streaming-ui", git = "https://github.com/microsoft/amplifier-module-hooks-streaming-ui?branch=main" },
-    { name = "amplifier-module-provider-litellm", git = "https://github.com/bkrabach/amplifier-module-provider-litellm?branch=main" },
+    { name = "amplifier-module-provider-litellm", git = "https://github.com/microsoft/amplifier-module-provider-litellm?branch=main" },
     { name = "amplifier-module-tool-mcp", git = "https://github.com/microsoft/amplifier-module-tool-mcp?branch=main" },
     { name = "amplifier-module-tool-web", git = "https://github.com/microsoft/amplifier-module-tool-web?branch=main" },
     { name = "click", specifier = ">=8.0" },
@@ -213,7 +213,7 @@ dependencies = [
 [[package]]
 name = "amplifier-module-provider-litellm"
 version = "0.1.0"
-source = { git = "https://github.com/bkrabach/amplifier-module-provider-litellm?branch=main#e5d87158124afd1da9592f6a5769fc3c7c391495" }
+source = { git = "https://github.com/microsoft/amplifier-module-provider-litellm?branch=main#c7660eb9e518124a2643c703445e6624729b6551" }
 dependencies = [
     { name = "amplifier-core" },
     { name = "litellm" },

@@ -264,7 +264,13 @@ def build_provider_config_for_model(
     #    (e.g. OpenClaw uses "google/" but litellm uses "gemini/")
     provider_model = _normalize_model_for_provider(model, entry.module)
 
-    config["default_model"] = provider_model
+    # Set model config for the target provider.
+    # Native providers (anthropic, openai) use "default_model" as the config key.
+    # litellm uses "model" as its config key.
+    if entry.module == "provider-litellm":
+        config["model"] = provider_model
+    else:
+        config["default_model"] = provider_model
     config["priority"] = 0  # Highest priority — this is the routed provider
 
     result: dict[str, Any] = {

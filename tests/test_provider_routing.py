@@ -166,8 +166,8 @@ class TestBuildProviderConfig:
         config = build_provider_config_for_model("ollama/llama3.2", table)
         assert config is not None
         assert config["module"] == "provider-litellm"
-        # litellm keeps the full prefixed model name
-        assert config["config"]["default_model"] == "ollama/llama3.2"
+        # litellm uses "model" config key (not "default_model")
+        assert config["config"]["model"] == "ollama/llama3.2"
 
     def test_native_provider_strips_prefix(self):
         """Native providers (anthropic, openai) get model name without provider prefix."""
@@ -184,21 +184,21 @@ class TestBuildProviderConfig:
         table = load_routing_table(DEFAULT_PROVIDER_ROUTING)
         for model in ["gemini/gemini-2.5-flash", "xai/grok-3", "groq/llama-3.3-70b"]:
             config = build_provider_config_for_model(model, table)
-            assert config["config"]["default_model"] == model
+            assert config["config"]["model"] == model
 
     def test_google_prefix_translated_to_gemini(self):
         """OpenClaw uses google/ but litellm expects gemini/."""
         table = load_routing_table(DEFAULT_PROVIDER_ROUTING)
         config = build_provider_config_for_model("google/gemini-3-pro-preview", table)
         assert config["module"] == "provider-litellm"
-        assert config["config"]["default_model"] == "gemini/gemini-3-pro-preview"
+        assert config["config"]["model"] == "gemini/gemini-3-pro-preview"
 
     def test_vllm_prefix_passes_through(self):
         """vLLM models should pass through to litellm as-is."""
         table = load_routing_table(DEFAULT_PROVIDER_ROUTING)
         config = build_provider_config_for_model("vllm/qwen3-coder-next", table)
         assert config["module"] == "provider-litellm"
-        assert config["config"]["default_model"] == "vllm/qwen3-coder-next"
+        assert config["config"]["model"] == "vllm/qwen3-coder-next"
 
     def test_merges_entry_config(self):
         """Extra config from routing entry should be merged."""
