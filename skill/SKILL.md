@@ -12,7 +12,7 @@ metadata:
             {
               "id": "uv",
               "kind": "uv",
-              "package": "amplifier-app-openclaw @ git+https://github.com/microsoft/amplifier-app-openclaw@v1.0.4",
+              "package": "amplifier-app-openclaw @ git+https://github.com/microsoft/amplifier-app-openclaw@v1.0.5",
               "bins": ["amplifier-openclaw"],
               "label": "Install Amplifier OpenClaw integration (uv)",
             },
@@ -145,5 +145,5 @@ Report costs only when asked or when notable (>$1).
 If not already installed:
 
 ```bash
-uv tool install "amplifier-app-openclaw @ git+https://github.com/microsoft/amplifier-app-openclaw@v1.0.4"
+uv tool install "amplifier-app-openclaw @ git+https://github.com/microsoft/amplifier-app-openclaw@v1.0.5"
 ```
