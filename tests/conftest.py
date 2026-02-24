@@ -43,6 +43,15 @@ else:
     ac = sys.modules["amplifier_core"]
 
 # amplifier_foundation and its submodules
+if "amplifier_core.hooks" not in sys.modules:
+    ach = _make_mock_module("amplifier_core.hooks")
+
+    class _HookResultHooks:
+        def __init__(self, action="continue", data=None):
+            self.action = action
+            self.data = data
+    ach.HookResult = _HookResultHooks
+
 if "amplifier_foundation" not in sys.modules:
     af = _make_mock_module("amplifier_foundation")
 
@@ -61,6 +70,7 @@ if "amplifier_foundation" not in sys.modules:
 
     # load_bundle async mock
     af.load_bundle = AsyncMock()
+    af.generate_sub_session_id = MagicMock(return_value="child-session-001")
 
 if "amplifier_foundation.registry" not in sys.modules:
     reg = _make_mock_module("amplifier_foundation.registry")

@@ -195,15 +195,17 @@ class TestStreamingHook:
 # ---------------------------------------------------------------------------
 
 class TestSpawnManager:
-    def test_cli_spawn_raises(self):
+    def test_cli_spawn_requires_agent_name(self):
         from amplifier_app_openclaw.spawn import CLISpawnManager
 
         async def _test():
             sm = CLISpawnManager(MagicMock())
-            with pytest.raises(NotImplementedError):
+            # spawn() now works but requires agent_name kwarg
+            with pytest.raises(KeyError):
                 await sm.spawn()
-            with pytest.raises(NotImplementedError):
-                await sm.resume()
+            # resume() returns graceful failure dict (not an exception)
+            result = await sm.resume()
+            assert result["status"] == "failed"
 
         asyncio.get_event_loop().run_until_complete(_test())
 

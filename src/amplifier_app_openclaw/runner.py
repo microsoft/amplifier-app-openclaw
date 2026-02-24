@@ -231,7 +231,7 @@ async def run_task(
         resolver = BaseMentionResolver(base_path=Path(cwd))
         session.coordinator.register_capability("mention_resolver", resolver)
 
-        # Register spawn/resume capabilities (stubs in Phase 0)
+        # Register spawn/resume capabilities for agent delegation and recipes
         spawn_mgr = CLISpawnManager(prepared)
         session.coordinator.register_capability("session.spawn", spawn_mgr.spawn)
         session.coordinator.register_capability("session.resume", spawn_mgr.resume)
