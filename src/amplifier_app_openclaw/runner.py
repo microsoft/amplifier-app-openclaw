@@ -128,24 +128,33 @@ async def run_task(
             else:
                 raise
         bundle = CHAT_OVERLAY.compose(bundle)
+
+        # Build provider overlay from OpenClaw config.
+        # This reads auth-profiles.json for credentials and routes the model
+        # to the appropriate Amplifier provider module.  The overlay is composed
+        # onto the bundle BEFORE prepare(), so credentials flow through
+        # Amplifier's normal composition → prepare → mount plan pipeline.
+        from amplifier_app_openclaw.openclaw_config import build_openclaw_provider_overlay
+        provider_config = build_openclaw_provider_overlay(model)
+        if provider_config:
+            provider_overlay = Bundle(
+                name="_openclaw_provider",
+                providers=[provider_config],
+            )
+            bundle = bundle.compose(provider_overlay)
+            logger.info(
+                "Composed OpenClaw provider overlay: %s (model: %s)",
+                provider_config.get("module"), model or "default",
+            )
+        else:
+            # No OpenClaw config available — fall back to user providers
+            # (these will be injected post-prepare via settings.yaml)
+            logger.info("No OpenClaw provider config; falling back to settings.yaml")
+
         prepared = await bundle.prepare(install_deps=True)
 
-        # Route model to the best Amplifier provider module.
-        # When --model is specified, the routed provider REPLACES user-configured
-        # providers from settings.yaml.  This ensures we don't fail trying to load
-        # a provider whose API key isn't available on this machine.
-        if model:
-            from amplifier_app_openclaw.provider_routing import build_provider_config_for_model
-            routed = build_provider_config_for_model(model)
-            if routed:
-                # Replace all providers with just the routed one
-                prepared.mount_plan["providers"] = [routed]
-                logger.info("Provider routing: using %s for model %s", routed["module"], model)
-            else:
-                # No routing match — fall back to user providers
-                _inject_user_providers(prepared)
-        else:
-            # No --model specified — use user-configured providers as usual
+        # If no provider was composed from OpenClaw, try settings.yaml fallback
+        if not provider_config:
             _inject_user_providers(prepared)
 
         # Handle persistence
