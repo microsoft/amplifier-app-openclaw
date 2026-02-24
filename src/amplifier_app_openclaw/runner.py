@@ -153,8 +153,17 @@ async def run_task(
 
         prepared = await bundle.prepare(install_deps=True)
 
-        # If no provider was composed from OpenClaw, try settings.yaml fallback
-        if not provider_config:
+        if provider_config:
+            # REPLACE all providers with just the routed one.
+            # Bundle.compose() merges providers by module ID, so the base bundle's
+            # providers (e.g. provider-anthropic from foundation) survive the merge.
+            # Since we're running under OpenClaw with a specific model/provider,
+            # we want ONLY our routed provider — not whatever the bundle shipped with
+            # or what env vars happen to make available.
+            prepared.mount_plan["providers"] = [provider_config]
+            logger.info("Replaced mount plan providers with OpenClaw-routed provider only")
+        else:
+            # No OpenClaw config — try settings.yaml fallback
             _inject_user_providers(prepared)
 
         # Handle persistence
