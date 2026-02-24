@@ -12,7 +12,7 @@ metadata:
             {
               "id": "uv",
               "kind": "uv",
-              "package": "amplifier-app-openclaw @ git+https://github.com/microsoft/amplifier-app-openclaw@main",
+              "package": "amplifier-app-openclaw @ git+https://github.com/microsoft/amplifier-app-openclaw@v1.0.4",
               "bins": ["amplifier-openclaw"],
               "label": "Install Amplifier OpenClaw integration (uv)",
             },
@@ -65,15 +65,9 @@ exec command:"amplifier-openclaw run --model xai/grok-3 'Research task'" backgro
 
 **Tip:** If OpenClaw is using a specific model, pass it through with `--model` so Amplifier uses the same one.
 
-### Provider Routing
+### Model Support
 
-The `--model` flag auto-routes to the best provider:
-
-| Model | Provider | Features |
-|---|---|---|
-| `anthropic/claude-*` | provider-anthropic | Thinking, caching, 1M context, tool repair |
-| `openai/gpt-4o*`, `openai/o3*` | provider-openai | Responses API, reasoning |
-| Everything else | provider-litellm | 100+ providers via env vars |
+The `--model` flag accepts any model identifier (e.g. `anthropic/claude-sonnet-4-20250514`, `openai/gpt-4o`, `gemini/gemini-2.5-flash`). The CLI automatically routes to the appropriate provider.
 
 
 ### Bundles
@@ -151,5 +145,5 @@ Report costs only when asked or when notable (>$1).
 If not already installed:
 
 ```bash
-uv tool install "amplifier-app-openclaw @ git+https://github.com/microsoft/amplifier-app-openclaw@main"
+uv tool install "amplifier-app-openclaw @ git+https://github.com/microsoft/amplifier-app-openclaw@v1.0.4"
 ```
